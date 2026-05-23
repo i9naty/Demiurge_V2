@@ -1,0 +1,48 @@
+# Dependencies
+**/node_modules/
+
+# Build output
+dist/
+build/
+.turbo/
+.vite/
+*.tsbuildinfo
+
+# Environment files (all variants)
+.env
+.env.*
+!.env.example
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Uploads
+uploads/
+
+# Secrets & certificates
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx
+
+# Coverage
+coverage/
+.nyc_output/
+
+# Temp
+tmp/
+.tmp/

@@ -1,0 +1,19 @@
+{
+  "name": "demiurge",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Demiurge — виртуальный стол, живой мир и социальная платформа",
+  "scripts": {
+    "dev": "concurrently \"npm run dev:server\" \"npm run dev:client\"",
+    "dev:server": "cd server && npm run dev",
+    "dev:client": "cd client && npm run dev",
+    "build": "cd client && npm run build && cd ../server && npm run build",
+    "start": "cd server && npm start",
+    "db:up": "docker compose up -d postgres redis",
+    "db:down": "docker compose down",
+    "install:all": "npm install && cd server && npm install && cd ../client && npm install"
+  },
+  "devDependencies": {
+    "concurrently": "^9.0.1"
+  }
+}
