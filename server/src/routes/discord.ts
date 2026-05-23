@@ -3,6 +3,7 @@ import { v4 as uuid } from 'uuid';
 import { query } from '../config/database';
 import { authMiddleware } from '../middleware/auth';
 import { ok, fail } from '../middleware/response';
+import { logger } from '../config/logger';
 
 export const discordRouter = Router();
 
@@ -27,7 +28,7 @@ discordRouter.get('/servers', authMiddleware, async (req: Request, res: Response
     );
     ok(res, result.rows);
   } catch (err: any) {
-    console.error('Discord servers error:', err.message);
+    logger.error({ err }, 'Discord servers error');
     fail(res, 'SERVER_ERROR', 'Ошибка загрузки серверов', 500);
   }
 });
@@ -45,7 +46,7 @@ discordRouter.post('/servers', authMiddleware, async (req: Request, res: Respons
     const result = await query('SELECT * FROM discord_servers WHERE id = $1', [id]);
     ok(res, result.rows[0], 201);
   } catch (err: any) {
-    console.error('Discord create server:', err.message);
+    logger.error({ err }, 'Discord create server');
     fail(res, 'SERVER_ERROR', 'Ошибка создания сервера', 500);
   }
 });
@@ -58,7 +59,7 @@ discordRouter.post('/servers/join/:code', authMiddleware, async (req: Request, r
     await query('INSERT INTO discord_server_members (server_id, user_id) VALUES ($1,$2) ON CONFLICT DO NOTHING', [srv.rows[0].id, req.user!.userId]);
     ok(res, srv.rows[0]);
   } catch (err: any) {
-    console.error('Discord join:', err.message);
+    logger.error({ err }, 'Discord join');
     fail(res, 'SERVER_ERROR', 'Ошибка входа на сервер', 500);
   }
 });
@@ -69,7 +70,7 @@ discordRouter.patch('/servers/:serverId', authMiddleware, async (req: Request, r
     const { name } = req.body;
     await query('UPDATE discord_servers SET name = COALESCE($1, name) WHERE id = $2 AND owner_id = $3', [name, (req.params.serverId as string), req.user!.userId]);
     ok(res, {});
-  } catch (err: any) { console.error('Discord patch server:', err.message); fail(res, 'SERVER_ERROR', 'Ошибка', 500); }
+  } catch (err: any) { logger.error({ err }, 'Discord patch server'); fail(res, 'SERVER_ERROR', 'Ошибка', 500); }
 });
 
 // Delete server (owner only)
@@ -77,7 +78,7 @@ discordRouter.delete('/servers/:serverId', authMiddleware, async (req: Request, 
   try {
     await query('DELETE FROM discord_servers WHERE id = $1 AND owner_id = $2', [(req.params.serverId as string), req.user!.userId]);
     ok(res, {});
-  } catch (err: any) { console.error('Discord delete server:', err.message); fail(res, 'SERVER_ERROR', 'Ошибка', 500); }
+  } catch (err: any) { logger.error({ err }, 'Discord delete server'); fail(res, 'SERVER_ERROR', 'Ошибка', 500); }
 });
 
 // Get channels for a server
@@ -88,7 +89,7 @@ discordRouter.get('/servers/:serverId/channels', authMiddleware, async (req: Req
       [(req.params.serverId as string)]
     );
     ok(res, result.rows);
-  } catch (err: any) { console.error('Channels error:', err.message); fail(res, 'SERVER_ERROR', 'Ошибка', 500); }
+  } catch (err: any) { logger.error({ err }, 'Channels error'); fail(res, 'SERVER_ERROR', 'Ошибка', 500); }
 });
 
 // Create channel (must be member)
@@ -103,7 +104,7 @@ discordRouter.post('/servers/:serverId/channels', authMiddleware, async (req: Re
     await query('INSERT INTO discord_channels (id, server_id, name, type) VALUES ($1,$2,$3,$4)', [id, (req.params.serverId as string), name, type]);
     const result = await query('SELECT * FROM discord_channels WHERE id = $1', [id]);
     ok(res, result.rows[0], 201);
-  } catch (err: any) { console.error('Create channel error:', err.message); fail(res, 'SERVER_ERROR', 'Ошибка', 500); }
+  } catch (err: any) { logger.error({ err }, 'Create channel error'); fail(res, 'SERVER_ERROR', 'Ошибка', 500); }
 });
 
 // Get messages for a channel
@@ -116,7 +117,7 @@ discordRouter.get('/channels/:channelId/messages', authMiddleware, async (req: R
       [(req.params.channelId as string)]
     );
     ok(res, result.rows);
-  } catch (err: any) { console.error('Messages error:', err.message); fail(res, 'SERVER_ERROR', 'Ошибка', 500); }
+  } catch (err: any) { logger.error({ err }, 'Messages error'); fail(res, 'SERVER_ERROR', 'Ошибка', 500); }
 });
 
 // Update channel (member only)
@@ -130,7 +131,7 @@ discordRouter.patch('/channels/:channelId', authMiddleware, async (req: Request,
     await query('UPDATE discord_channels SET name = COALESCE($1, name), position = COALESCE($2, position) WHERE id = $3',
       [name, position, (req.params.channelId as string)]);
     ok(res, {});
-  } catch (err: any) { console.error('Patch channel error:', err.message); fail(res, 'SERVER_ERROR', 'Ошибка', 500); }
+  } catch (err: any) { logger.error({ err }, 'Patch channel error'); fail(res, 'SERVER_ERROR', 'Ошибка', 500); }
 });
 
 // Delete channel (member only)
@@ -142,7 +143,7 @@ discordRouter.delete('/channels/:channelId', authMiddleware, async (req: Request
     }
     await query('DELETE FROM discord_channels WHERE id = $1', [(req.params.channelId as string)]);
     ok(res, {});
-  } catch (err: any) { console.error('Delete channel error:', err.message); fail(res, 'SERVER_ERROR', 'Ошибка', 500); }
+  } catch (err: any) { logger.error({ err }, 'Delete channel error'); fail(res, 'SERVER_ERROR', 'Ошибка', 500); }
 });
 
 // Get server members
@@ -155,7 +156,7 @@ discordRouter.get('/servers/:serverId/members', authMiddleware, async (req: Requ
       [(req.params.serverId as string)]
     );
     ok(res, result.rows);
-  } catch (err: any) { console.error('Members error:', err.message); fail(res, 'SERVER_ERROR', 'Ошибка', 500); }
+  } catch (err: any) { logger.error({ err }, 'Members error'); fail(res, 'SERVER_ERROR', 'Ошибка', 500); }
 });
 
 // Delete message (own only)
@@ -163,7 +164,7 @@ discordRouter.delete('/messages/:messageId', authMiddleware, async (req: Request
   try {
     await query('DELETE FROM discord_messages WHERE id = $1 AND user_id = $2', [(req.params.messageId as string), req.user!.userId]);
     ok(res, {});
-  } catch (err: any) { console.error('Delete msg error:', err.message); fail(res, 'SERVER_ERROR', 'Ошибка', 500); }
+  } catch (err: any) { logger.error({ err }, 'Delete msg error'); fail(res, 'SERVER_ERROR', 'Ошибка', 500); }
 });
 
 // Edit message (own only)
@@ -174,7 +175,7 @@ discordRouter.patch('/messages/:messageId', authMiddleware, async (req: Request,
     await query('UPDATE discord_messages SET content = $1 WHERE id = $2 AND user_id = $3',
       [content, (req.params.messageId as string), req.user!.userId]);
     ok(res, {});
-  } catch (err: any) { console.error('Edit msg error:', err.message); fail(res, 'SERVER_ERROR', 'Ошибка', 500); }
+  } catch (err: any) { logger.error({ err }, 'Edit msg error'); fail(res, 'SERVER_ERROR', 'Ошибка', 500); }
 });
 
 // Add reaction
@@ -186,7 +187,7 @@ discordRouter.post('/messages/:messageId/reactions', authMiddleware, async (req:
       [(req.params.messageId as string), req.user!.userId, emoji]);
     const count = await query('SELECT emoji, COUNT(*) as cnt FROM discord_reactions WHERE message_id = $1 GROUP BY emoji', [(req.params.messageId as string)]);
     ok(res, { reactions: count.rows });
-  } catch (err: any) { console.error('Reaction error:', err.message); fail(res, 'SERVER_ERROR', 'Ошибка', 500); }
+  } catch (err: any) { logger.error({ err }, 'Reaction error'); fail(res, 'SERVER_ERROR', 'Ошибка', 500); }
 });
 
 // Remove reaction
@@ -197,7 +198,7 @@ discordRouter.delete('/messages/:messageId/reactions', authMiddleware, async (re
       [(req.params.messageId as string), req.user!.userId, emoji]);
     const count = await query('SELECT emoji, COUNT(*) as cnt FROM discord_reactions WHERE message_id = $1 GROUP BY emoji', [(req.params.messageId as string)]);
     ok(res, { reactions: count.rows });
-  } catch (err: any) { console.error('Remove reaction error:', err.message); fail(res, 'SERVER_ERROR', 'Ошибка', 500); }
+  } catch (err: any) { logger.error({ err }, 'Remove reaction error'); fail(res, 'SERVER_ERROR', 'Ошибка', 500); }
 });
 
 // Get reactions
@@ -205,7 +206,7 @@ discordRouter.get('/messages/:messageId/reactions', authMiddleware, async (req: 
   try {
     const result = await query('SELECT emoji, COUNT(*) as cnt FROM discord_reactions WHERE message_id = $1 GROUP BY emoji', [(req.params.messageId as string)]);
     ok(res, result.rows);
-  } catch (err: any) { console.error('Get reactions error:', err.message); fail(res, 'SERVER_ERROR', 'Ошибка загрузки реакций', 500); }
+  } catch (err: any) { logger.error({ err }, 'Get reactions error'); fail(res, 'SERVER_ERROR', 'Ошибка загрузки реакций', 500); }
 });
 
 // Create category
@@ -218,7 +219,7 @@ discordRouter.post('/servers/:serverId/categories', authMiddleware, async (req: 
     await query("INSERT INTO discord_channels (id, server_id, name, type, position) VALUES ($1,$2,$3,'category',$4)", [id, (req.params.serverId as string), name, max.rows[0].n]);
     const result = await query('SELECT * FROM discord_channels WHERE id = $1', [id]);
     ok(res, result.rows[0], 201);
-  } catch (err: any) { console.error('Category error:', err.message); fail(res, 'SERVER_ERROR', 'Ошибка', 500); }
+  } catch (err: any) { logger.error({ err }, 'Category error'); fail(res, 'SERVER_ERROR', 'Ошибка', 500); }
 });
 
 // Get server roles
@@ -226,7 +227,7 @@ discordRouter.get('/servers/:serverId/roles', authMiddleware, async (req: Reques
   try {
     const result = await query('SELECT * FROM discord_roles WHERE server_id = $1 ORDER BY position', [(req.params.serverId as string)]);
     ok(res, result.rows);
-  } catch (err: any) { console.error('Roles error:', err.message); fail(res, 'SERVER_ERROR', 'Ошибка загрузки ролей', 500); }
+  } catch (err: any) { logger.error({ err }, 'Roles error'); fail(res, 'SERVER_ERROR', 'Ошибка загрузки ролей', 500); }
 });
 
 // Create role
@@ -239,7 +240,7 @@ discordRouter.post('/servers/:serverId/roles', authMiddleware, async (req: Reque
     await query('INSERT INTO discord_roles (id, server_id, name, color, position) VALUES ($1,$2,$3,$4,$5)', [id, (req.params.serverId as string), name, color, max.rows[0].n]);
     const result = await query('SELECT * FROM discord_roles WHERE id = $1', [id]);
     ok(res, result.rows[0], 201);
-  } catch (err: any) { console.error('Create role error:', err.message); fail(res, 'SERVER_ERROR', 'Ошибка', 500); }
+  } catch (err: any) { logger.error({ err }, 'Create role error'); fail(res, 'SERVER_ERROR', 'Ошибка', 500); }
 });
 
 // Delete role
@@ -248,5 +249,5 @@ discordRouter.delete('/servers/:serverId/roles/:roleId', authMiddleware, async (
     if (!await requireMember(req.user!.userId, (req.params.serverId as string))) { fail(res, 'FORBIDDEN', 'Нет доступа', 403); return; }
     await query('DELETE FROM discord_roles WHERE id = $1 AND server_id = $2', [req.params.roleId, (req.params.serverId as string)]);
     ok(res, {});
-  } catch (err: any) { console.error('Delete role error:', err.message); fail(res, 'SERVER_ERROR', 'Ошибка', 500); }
+  } catch (err: any) { logger.error({ err }, 'Delete role error'); fail(res, 'SERVER_ERROR', 'Ошибка', 500); }
 });

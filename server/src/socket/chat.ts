@@ -2,6 +2,7 @@ import { Server, Socket } from 'socket.io';
 import { v4 as uuid } from 'uuid';
 import { query } from '../config/database';
 import { connectedUsers } from './shared';
+import { logger } from '../config/logger';
 
 export function registerChatHandlers(socket: Socket, io: Server, userId: string, username: string): void {
   socket.on('chat:message', async (data: { roomId: string; content: string; type?: string }) => {
@@ -24,7 +25,7 @@ export function registerChatHandlers(socket: Socket, io: Server, userId: string,
       }
     }
     const msgId = uuid();
-    try { await query('INSERT INTO messages (id, room_id, user_id, content, type, metadata) VALUES ($1,$2,$3,$4,$5,$6)', [msgId, roomId, userId, processedContent, messageType, metadata ? JSON.stringify(metadata) : '{}']); } catch (err) { console.error('Save chat message error:', err instanceof Error ? err.message : err); }
+    try { await query('INSERT INTO messages (id, room_id, user_id, content, type, metadata) VALUES ($1,$2,$3,$4,$5,$6)', [msgId, roomId, userId, processedContent, messageType, metadata ? JSON.stringify(metadata) : '{}']); } catch (err) { logger.error({ err }, 'Save chat message error'); }
     io.to(roomId).emit('chat:message', { id: msgId, roomId, userId, username, content: processedContent, type: messageType, metadata, createdAt: new Date().toISOString() });
 
     if (processedContent.startsWith('/w ') || processedContent.startsWith('/whisper ')) {

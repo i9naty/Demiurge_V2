@@ -1,13 +1,14 @@
 import { Request, Response, NextFunction } from 'express';
 import { v4 as uuidv4 } from 'uuid';
 import { env } from '../config/env';
+import { logger } from '../config/logger';
 
 const isDev = env.NODE_ENV === 'development';
 
 export function errorHandler(err: Error, req: Request, res: Response, _next: NextFunction): void {
   const requestId = (req.headers['x-request-id'] as string) || uuidv4();
 
-  console.error(`[${requestId}] ${req.method} ${req.path}:`, err.message);
+  logger.error({ err, requestId, method: req.method, path: req.path }, 'Request error');
 
   if (res.headersSent) {
     return;

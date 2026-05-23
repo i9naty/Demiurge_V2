@@ -3,6 +3,7 @@ import { v4 as uuid } from 'uuid';
 import { query } from '../config/database';
 import { authMiddleware, optionalAuth } from '../middleware/auth';
 import { ok, fail } from '../middleware/response';
+import { logger } from '../config/logger';
 
 export const socialRouter = Router();
 
@@ -36,7 +37,7 @@ socialRouter.post('/posts', authMiddleware, async (req: Request, res: Response) 
 
     ok(res, result.rows[0], 201);
   } catch (err: any) {
-    console.error('Social create post:', err.message);
+    logger.error({ err }, 'Social create post');
     fail(res, 'SERVER_ERROR', 'Ошибка создания поста', 500);
   }
 });
@@ -60,7 +61,7 @@ socialRouter.get('/posts', optionalAuth, async (req: Request, res: Response) => 
 
     ok(res, result.rows);
   } catch (err: any) {
-    console.error('Social feed:', err.message);
+    logger.error({ err }, 'Social feed');
     fail(res, 'SERVER_ERROR', 'Ошибка получения ленты', 500);
   }
 });
@@ -81,7 +82,7 @@ socialRouter.get('/posts/popular', optionalAuth, async (req: Request, res: Respo
     );
     ok(res, result.rows);
   } catch (err: any) {
-    console.error('Social popular:', err.message);
+    logger.error({ err }, 'Social popular');
     fail(res, 'SERVER_ERROR', 'Ошибка получения популярного', 500);
   }
 });
@@ -96,7 +97,7 @@ socialRouter.post('/posts/:postId/like', authMiddleware, async (req: Request, re
     const count = await query('SELECT COUNT(*) FROM post_likes WHERE post_id = $1', [(req.params.postId as string)]);
     ok(res, { likesCount: parseInt(count.rows[0].count) });
   } catch (err: any) {
-    console.error('Social like:', err.message);
+    logger.error({ err }, 'Social like');
     fail(res, 'SERVER_ERROR', 'Ошибка лайка', 500);
   }
 });
@@ -111,7 +112,7 @@ socialRouter.delete('/posts/:postId/like', authMiddleware, async (req: Request, 
     const count = await query('SELECT COUNT(*) FROM post_likes WHERE post_id = $1', [(req.params.postId as string)]);
     ok(res, { likesCount: parseInt(count.rows[0].count) });
   } catch (err: any) {
-    console.error('Social unlike:', err.message);
+    logger.error({ err }, 'Social unlike');
     fail(res, 'SERVER_ERROR', 'Ошибка удаления лайка', 500);
   }
 });
@@ -127,7 +128,7 @@ socialRouter.get('/posts/:postId/comments', optionalAuth, async (req: Request, r
     );
     ok(res, result.rows);
   } catch (err: any) {
-    console.error('Social comments:', err.message);
+    logger.error({ err }, 'Social comments');
     fail(res, 'SERVER_ERROR', 'Ошибка получения комментариев', 500);
   }
 });
@@ -157,7 +158,7 @@ socialRouter.post('/posts/:postId/comments', authMiddleware, async (req: Request
 
     ok(res, result.rows[0], 201);
   } catch (err: any) {
-    console.error('Social comment:', err.message);
+    logger.error({ err }, 'Social comment');
     fail(res, 'SERVER_ERROR', 'Ошибка создания комментария', 500);
   }
 });
@@ -194,7 +195,7 @@ socialRouter.get('/profile/:username', optionalAuth, async (req: Request, res: R
 
     ok(res, { profile, posts: posts.rows });
   } catch (err: any) {
-    console.error('Social profile:', err.message);
+    logger.error({ err }, 'Social profile');
     fail(res, 'SERVER_ERROR', 'Ошибка получения профиля', 500);
   }
 });

@@ -4,6 +4,7 @@ import bcrypt from 'bcryptjs';
 import { query } from '../config/database';
 import { authMiddleware, optionalAuth } from '../middleware/auth';
 import { ok, fail } from '../middleware/response';
+import { logger } from '../config/logger';
 
 export const roomsRouter = Router();
 
@@ -45,7 +46,7 @@ roomsRouter.post('/', authMiddleware, async (req: Request, res: Response) => {
     const result = await query('SELECT * FROM rooms WHERE id = $1', [roomId]);
     ok(res, result.rows[0], 201);
   } catch (err: any) {
-    console.error('Create room error:', err.message);
+    logger.error({ err }, 'Create room error');
     fail(res, 'SERVER_ERROR', 'Ошибка создания комнаты', 500);
   }
 });
@@ -73,7 +74,7 @@ roomsRouter.get('/', optionalAuth, async (req: Request, res: Response) => {
     const result = await query(sql, params);
     ok(res, result.rows);
   } catch (err: any) {
-    console.error('List rooms error:', err.message);
+    logger.error({ err }, 'List rooms error');
     fail(res, 'SERVER_ERROR', 'Ошибка получения списка комнат', 500);
   }
 });
@@ -91,7 +92,7 @@ roomsRouter.get('/my', authMiddleware, async (req: Request, res: Response) => {
     );
     ok(res, result.rows);
   } catch (err: any) {
-    console.error('My rooms error:', err.message);
+    logger.error({ err }, 'My rooms error');
     fail(res, 'SERVER_ERROR', 'Ошибка получения комнат', 500);
   }
 });
@@ -114,7 +115,7 @@ roomsRouter.get('/:id', optionalAuth, async (req: Request, res: Response) => {
 
     ok(res, result.rows[0]);
   } catch (err: any) {
-    console.error('Get room error:', err.message);
+    logger.error({ err }, 'Get room error');
     fail(res, 'SERVER_ERROR', 'Ошибка получения комнаты', 500);
   }
 });
@@ -159,7 +160,7 @@ roomsRouter.post('/join/:code', authMiddleware, async (req: Request, res: Respon
     await query('UPDATE rooms SET updated_at = NOW() WHERE id = $1', [r.id]);
     ok(res, r);
   } catch (err: any) {
-    console.error('Join room error:', err.message);
+    logger.error({ err }, 'Join room error');
     fail(res, 'SERVER_ERROR', 'Ошибка входа в комнату', 500);
   }
 });
@@ -178,7 +179,7 @@ roomsRouter.delete('/:id', authMiddleware, async (req: Request, res: Response) =
     await query('DELETE FROM rooms WHERE id = $1', [(req.params.id as string)]);
     ok(res, {});
   } catch (err: any) {
-    console.error('Delete room error:', err.message);
+    logger.error({ err }, 'Delete room error');
     fail(res, 'SERVER_ERROR', 'Ошибка удаления комнаты', 500);
   }
 });
@@ -189,7 +190,7 @@ roomsRouter.get('/:id/tokens', optionalAuth, async (req: Request, res: Response)
     const result = await query('SELECT * FROM tokens WHERE room_id = $1 ORDER BY layer, created_at', [(req.params.id as string)]);
     ok(res, result.rows);
   } catch (err: any) {
-    console.error('Tokens error:', err.message);
+    logger.error({ err }, 'Tokens error');
     fail(res, 'SERVER_ERROR', 'Ошибка получения токенов', 500);
   }
 });
@@ -208,7 +209,7 @@ roomsRouter.get('/:id/scenes', optionalAuth, async (req: Request, res: Response)
     }
     ok(res, result.rows);
   } catch (err: any) {
-    console.error('Scenes error:', err.message);
+    logger.error({ err }, 'Scenes error');
     fail(res, 'SERVER_ERROR', 'Ошибка загрузки сцен', 500);
   }
 });
@@ -223,7 +224,7 @@ roomsRouter.post('/:id/scenes', authMiddleware, async (req: Request, res: Respon
     const result = await query('SELECT * FROM scenes WHERE id = $1', [id]);
     ok(res, result.rows[0], 201);
   } catch (err: any) {
-    console.error('Create scene error:', err.message);
+    logger.error({ err }, 'Create scene error');
     fail(res, 'SERVER_ERROR', 'Ошибка создания сцены', 500);
   }
 });
@@ -240,7 +241,7 @@ roomsRouter.patch('/:id/scenes/:sceneId', authMiddleware, async (req: Request, r
     );
     ok(res, {});
   } catch (err: any) {
-    console.error('Patch scene error:', err.message);
+    logger.error({ err }, 'Patch scene error');
     fail(res, 'SERVER_ERROR', 'Ошибка обновления сцены', 500);
   }
 });
@@ -250,7 +251,7 @@ roomsRouter.delete('/:id/scenes/:sceneId', authMiddleware, async (req: Request, 
     await query('DELETE FROM scenes WHERE id=$1 AND room_id=$2', [(req.params.sceneId as string), (req.params.id as string)]);
     ok(res, {});
   } catch (err: any) {
-    console.error('Delete scene error:', err.message);
+    logger.error({ err }, 'Delete scene error');
     fail(res, 'SERVER_ERROR', 'Ошибка удаления сцены', 500);
   }
 });
@@ -266,7 +267,7 @@ roomsRouter.get('/:id/messages', optionalAuth, async (req: Request, res: Respons
     );
     ok(res, result.rows.reverse());
   } catch (err: any) {
-    console.error('Messages error:', err.message);
+    logger.error({ err }, 'Messages error');
     fail(res, 'SERVER_ERROR', 'Ошибка получения сообщений', 500);
   }
 });

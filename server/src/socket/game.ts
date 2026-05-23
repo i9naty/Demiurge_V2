@@ -4,6 +4,7 @@ import { getAssetIdList } from '../services/assetScanner';
 import { generateWorld, generateFallbackWorld, processGameAction, smartFallback } from '../services/storyAI';
 import { incrementStat } from '../routes/achievements';
 import { connectedUsers, requireAuth } from './shared';
+import { logger } from '../config/logger';
 
 export function registerGameHandlers(socket: Socket, io: Server, userId: string, username: string): void {
   socket.on('lobby:join', async (sessionId: string) => {
@@ -11,7 +12,7 @@ export function registerGameHandlers(socket: Socket, io: Server, userId: string,
     const user = connectedUsers.get(socket.id); if (user) user.sessionId = sessionId;
     try {
       await query('UPDATE lobby_participants SET is_online = true WHERE session_id = $1 AND user_id = $2', [sessionId, userId]);
-    } catch (err) { console.error('Lobby join error:', err instanceof Error ? err.message : err); }
+    } catch (err) { logger.error({ err }, 'Lobby join error'); }
     const participants = await query(
       'SELECT lp.*, u.username, u.avatar_url FROM lobby_participants lp JOIN users u ON lp.user_id = u.id WHERE lp.session_id = $1',
       [sessionId]
@@ -24,7 +25,7 @@ export function registerGameHandlers(socket: Socket, io: Server, userId: string,
     const user = connectedUsers.get(socket.id); if (user) user.sessionId = null;
     try {
       await query('UPDATE lobby_participants SET is_online = false WHERE session_id = $1 AND user_id = $2', [sessionId, userId]);
-    } catch (err) { console.error('Lobby leave error:', err instanceof Error ? err.message : err); }
+    } catch (err) { logger.error({ err }, 'Lobby leave error'); }
     const participants = await query(
       'SELECT lp.*, u.username, u.avatar_url FROM lobby_participants lp JOIN users u ON lp.user_id = u.id WHERE lp.session_id = $1',
       [sessionId]
@@ -37,13 +38,13 @@ export function registerGameHandlers(socket: Socket, io: Server, userId: string,
       try {
         await query('UPDATE lobby_participants SET character_data = $1 WHERE session_id = $2 AND user_id = $3',
           [JSON.stringify(data.characterData), data.sessionId, userId]);
-      } catch (err) { console.error('Lobby update character error:', err instanceof Error ? err.message : err); }
+      } catch (err) { logger.error({ err }, 'Lobby update character error'); }
     }
     if (data.role) {
       try {
         await query('UPDATE lobby_participants SET role = $1 WHERE session_id = $2 AND user_id = $3',
           [data.role, data.sessionId, userId]);
-      } catch (err) { console.error('Lobby update role error:', err instanceof Error ? err.message : err); }
+      } catch (err) { logger.error({ err }, 'Lobby update role error'); }
     }
     const participants = await query(
       'SELECT lp.*, u.username, u.avatar_url FROM lobby_participants lp JOIN users u ON lp.user_id = u.id WHERE lp.session_id = $1',
@@ -86,7 +87,7 @@ export function registerGameHandlers(socket: Socket, io: Server, userId: string,
         playTime: settings.playTime || 60,
       });
     } catch (e) {
-      console.warn('AI world gen failed, using fallback');
+      logger.warn('AI world gen failed, using fallback');
     }
 
     if (!worldData) {
@@ -158,7 +159,7 @@ export function registerGameHandlers(socket: Socket, io: Server, userId: string,
     try {
       const pRes = await query('SELECT character_data FROM lobby_participants WHERE session_id = $1 AND user_id = $2', [data.sessionId, userId]);
       if (pRes.rows.length > 0) playerPrompt = (pRes.rows[0].character_data || {}).prompt || '';
-    } catch (err) { console.error('Game action character data error:', err instanceof Error ? err.message : err); }
+    } catch (err) { logger.error({ err }, 'Game action character data error'); }
 
     let response: any = null;
     try {
@@ -179,7 +180,7 @@ export function registerGameHandlers(socket: Socket, io: Server, userId: string,
         playerMaxHp,
         inventory: [],
       });
-    } catch (err) { console.error('Game action error:', err instanceof Error ? err.message : err); }
+    } catch (err) { logger.error({ err }, 'Game action error'); }
 
     if (!response || !response.description) {
       response = smartFallback({ action: data.action, curTokens, curObjects, ws, userId });
@@ -217,7 +218,7 @@ export function registerGameHandlers(socket: Socket, io: Server, userId: string,
     try {
       await query('UPDATE game_sessions SET world_state=$1, story_state=$2, updated_at=NOW() WHERE id=$3',
         [JSON.stringify(newWs), JSON.stringify(newSs), data.sessionId]);
-    } catch (err) { console.error('Save game error:', err instanceof Error ? err.message : err); }
+    } catch (err) { logger.error({ err }, 'Save game error'); }
 
     io.to(`game:${data.sessionId}`).emit('game:state', {
       description: response.description, options: response.options,

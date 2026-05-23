@@ -3,6 +3,7 @@ import { v4 as uuid } from 'uuid';
 import { query } from '../config/database';
 import { authMiddleware } from '../middleware/auth';
 import { ok, fail } from '../middleware/response';
+import { logger } from '../config/logger';
 
 export const characterRouter = Router();
 
@@ -17,7 +18,7 @@ characterRouter.get('/', authMiddleware, async (req: Request, res: Response) => 
     const result = await query(sql, params);
     ok(res, result.rows);
   } catch (err) {
-    console.error('List characters error:', err);
+    logger.error({ err }, 'List characters error');
     fail(res, 'SERVER_ERROR', 'Ошибка загрузки персонажей', 500);
   }
 });
@@ -32,7 +33,7 @@ characterRouter.get('/:id', authMiddleware, async (req: Request, res: Response) 
     if (result.rows.length === 0) { fail(res, 'NOT_FOUND', 'Персонаж не найден', 404); return; }
     ok(res, result.rows[0]);
   } catch (err) {
-    console.error('Get character error:', err);
+    logger.error({ err }, 'Get character error');
     fail(res, 'SERVER_ERROR', 'Ошибка загрузки персонажа', 500);
   }
 });
@@ -55,7 +56,7 @@ characterRouter.post('/', authMiddleware, async (req: Request, res: Response) =>
     const result = await query('SELECT * FROM character_sheets WHERE id = $1', [id]);
     ok(res, result.rows[0], 201);
   } catch (err) {
-    console.error('Create character error:', err);
+    logger.error({ err }, 'Create character error');
     fail(res, 'SERVER_ERROR', 'Ошибка создания персонажа', 500);
   }
 });
@@ -88,7 +89,7 @@ characterRouter.patch('/:id', authMiddleware, async (req: Request, res: Response
     const result = await query('SELECT * FROM character_sheets WHERE id = $1', [req.params.id]);
     ok(res, result.rows[0]);
   } catch (err) {
-    console.error('Update character error:', err);
+    logger.error({ err }, 'Update character error');
     fail(res, 'SERVER_ERROR', 'Ошибка обновления персонажа', 500);
   }
 });
@@ -103,7 +104,7 @@ characterRouter.delete('/:id', authMiddleware, async (req: Request, res: Respons
     if (result.rows.length === 0) { fail(res, 'NOT_FOUND', 'Персонаж не найден', 404); return; }
     ok(res, { deleted: true });
   } catch (err) {
-    console.error('Delete character error:', err);
+    logger.error({ err }, 'Delete character error');
     fail(res, 'SERVER_ERROR', 'Ошибка удаления персонажа', 500);
   }
 });

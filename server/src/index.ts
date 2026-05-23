@@ -4,9 +4,10 @@ import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
 import rateLimit from 'express-rate-limit';
+import { logger } from './config/logger';
+import { env } from './config/env';
 import { createServer } from 'http';
 import { Server as SocketIOServer } from 'socket.io';
-import { env } from './config/env';
 import { testConnection, runMigrations, disconnect as dbDisconnect, pool } from './config/database';
 import { getRedis, redisDisconnect } from './config/redis';
 import { scanAssets, getAssetIndex } from './services/assetScanner';
@@ -159,10 +160,10 @@ setupSocket(io);
 // Graceful shutdown
 function setupShutdown() {
   const cleanup = async (signal: string) => {
-    console.log(`\n🛑 Получен сигнал ${signal}, начинаем graceful shutdown...`);
+    logger.info({ signal }, 'Received shutdown signal, starting graceful shutdown');
 
     let forceExit = setTimeout(() => {
-      console.error('❌ Принудительное завершение по таймауту');
+      logger.fatal('Forced shutdown завершение по таймауту');
       process.exit(1);
     }, SHUTDOWN_TIMEOUT);
     forceExit.unref();
@@ -183,11 +184,11 @@ function setupShutdown() {
       await redisDisconnect();
 
       clearTimeout(forceExit);
-      console.log('✅ Graceful shutdown завершён');
+      logger.info(' Graceful shutdown завершён');
       process.exit(0);
     } catch (err) {
       clearTimeout(forceExit);
-      console.error('❌ Ошибка при shutdown:', err instanceof Error ? err.message : err);
+      logger.fatal({ err }, 'Shutdown error при shutdown:', err instanceof Error ? err.message : err);
       process.exit(1);
     }
   };
@@ -197,12 +198,12 @@ function setupShutdown() {
   process.on('SIGQUIT', () => cleanup('SIGQUIT'));
 
   process.on('uncaughtException', (err) => {
-    console.error('💥 Uncaught exception:', err);
+    logger.fatal({ err }, 'Uncaught exception exception:', err);
     cleanup('uncaughtException');
   });
 
   process.on('unhandledRejection', (reason) => {
-    console.error('💥 Unhandled rejection:', reason);
+    logger.fatal({ err: reason }, 'Unhandled rejection');
   });
 }
 
@@ -217,7 +218,7 @@ async function start() {
   scanAssets(path.resolve(__dirname, '../../client/public/assets'));
 
   httpServer.listen(env.PORT, () => {
-    console.log(`
+    logger.info(`
 ╔══════════════════════════════════════════╗
 ║        🔮 DEMIURGE PLATFORM             ║
 ║        Портал в бесконечные миры        ║

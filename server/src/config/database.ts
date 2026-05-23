@@ -2,6 +2,7 @@ import { Pool } from 'pg';
 import * as fs from 'fs';
 import * as path from 'path';
 import { env } from './env';
+import { logger } from './logger';
 
 const isDev = env.NODE_ENV === 'development';
 
@@ -13,7 +14,7 @@ export const pool = new Pool({
 });
 
 pool.on('error', (err: Error) => {
-  console.error('🐘 PostgreSQL pool error:', err.message);
+  logger.error({ err }, 'PostgreSQL pool error');
 });
 
 export async function query(text: string, params?: unknown[]) {
@@ -28,15 +29,15 @@ export async function query(text: string, params?: unknown[]) {
 export async function testConnection(): Promise<boolean> {
   try {
     await query('SELECT 1');
-    console.log('🐘 PostgreSQL подключена');
+    logger.info('PostgreSQL подключена');
     return true;
   } catch (err) {
     const message = err instanceof Error ? err.message : 'unknown error';
     if (isDev) {
-      console.warn('⚠️ PostgreSQL недоступна — работаем без БД');
+      logger.warn({ err: message }, 'PostgreSQL недоступна — работаем без БД');
       return false;
     }
-    console.error('❌ PostgreSQL недоступна:', message);
+    logger.fatal({ err: message }, 'PostgreSQL недоступна');
     process.exit(1);
   }
 }
@@ -45,7 +46,7 @@ export async function runMigrations(): Promise<void> {
   try {
     const schemaPath = path.resolve(__dirname, '../db/schema.sql');
     if (!fs.existsSync(schemaPath)) {
-      console.warn('⚠️ schema.sql не найден, пропускаем миграции');
+      logger.warn('schema.sql не найден, пропускаем миграции');
       return;
     }
 
@@ -62,15 +63,15 @@ export async function runMigrations(): Promise<void> {
       } catch (err) {
         const message = err instanceof Error ? err.message : 'unknown error';
         if (!message.includes('already exists') && !message.includes('duplicate')) {
-          console.warn('⚠️ Миграция:', message.slice(0, 80));
+          logger.warn({ err: message }, 'Migration warning');
         }
       }
     }
 
-    console.log('📦 Миграции выполнены');
+    logger.info('Миграции выполнены');
   } catch (err) {
     const message = err instanceof Error ? err.message : 'unknown error';
-    console.warn('⚠️ Ошибка миграций:', message.slice(0, 100));
+    logger.warn({ err: message.slice(0, 100) }, 'Migration error');
   }
 }
 

@@ -3,6 +3,7 @@ import { v4 as uuid } from 'uuid';
 import { query } from '../config/database';
 import { authMiddleware } from '../middleware/auth';
 import { ok, fail } from '../middleware/response';
+import { logger } from '../config/logger';
 
 export const dmRouter = Router();
 
@@ -18,7 +19,7 @@ dmRouter.get('/search/:query', authMiddleware, async (req: Request, res: Respons
     );
     ok(res, result.rows);
   } catch (err: any) {
-    console.error('DM search error:', err.message);
+    logger.error({ err }, 'DM search error');
     fail(res, 'SERVER_ERROR', 'Ошибка поиска', 500);
   }
 });
@@ -32,7 +33,7 @@ dmRouter.get('/unread/count', authMiddleware, async (req: Request, res: Response
     );
     ok(res, { count: parseInt(result.rows[0].count) });
   } catch (err: any) {
-    console.error('DM unread error:', err.message);
+    logger.error({ err }, 'DM unread error');
     ok(res, { count: 0 });
   }
 });
@@ -60,7 +61,7 @@ dmRouter.get('/conversations', authMiddleware, async (req: Request, res: Respons
     );
     ok(res, result.rows);
   } catch (err: any) {
-    console.error('DM conversations error:', err.message);
+    logger.error({ err }, 'DM conversations error');
     fail(res, 'SERVER_ERROR', 'Ошибка загрузки диалогов', 500);
   }
 });
@@ -90,7 +91,7 @@ dmRouter.get('/:userId', authMiddleware, async (req: Request, res: Response) => 
     );
     ok(res, result.rows);
   } catch (err: any) {
-    console.error('DM messages error:', err.message);
+    logger.error({ err }, 'DM messages error');
     fail(res, 'SERVER_ERROR', 'Ошибка загрузки сообщений', 500);
   }
 });
@@ -122,7 +123,7 @@ dmRouter.post('/:userId', authMiddleware, async (req: Request, res: Response) =>
 
     ok(res, result.rows[0], 201);
   } catch (err: any) {
-    console.error('DM send error:', err.message);
+    logger.error({ err }, 'DM send error');
     fail(res, 'SERVER_ERROR', 'Ошибка отправки сообщения', 500);
   }
 });

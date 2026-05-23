@@ -3,6 +3,7 @@ import { v4 as uuid } from 'uuid';
 import { pool, query } from '../config/database';
 import { authMiddleware, optionalAuth } from '../middleware/auth';
 import { ok, fail } from '../middleware/response';
+import { logger } from '../config/logger';
 
 export const sessionsRouter = Router();
 
@@ -21,7 +22,7 @@ sessionsRouter.get('/', optionalAuth, async (_req: Request, res: Response) => {
     );
     ok(res, result.rows);
   } catch (err: any) {
-    console.error('Sessions list:', err.message);
+    logger.error({ err }, 'Sessions list');
     fail(res, 'SERVER_ERROR', 'Ошибка загрузки сессий', 500);
   }
 });
@@ -88,8 +89,8 @@ sessionsRouter.post('/', authMiddleware, async (req: Request, res: Response) => 
     const result = await query('SELECT * FROM sessions_planned WHERE id = $1', [id]);
     ok(res, result.rows[0], 201);
   } catch (err: any) {
-    await client.query('ROLLBACK').catch((rollbackErr) => { console.error('Rollback error:', rollbackErr instanceof Error ? rollbackErr.message : rollbackErr); });
-    console.error('Session create error:', err.message);
+    await client.query('ROLLBACK').catch((rollbackErr) => { logger.error({ err: rollbackErr }, 'Rollback error'); });
+    logger.error({ err }, 'Session create error');
     fail(res, 'SERVER_ERROR', 'Ошибка создания сессии', 500);
   } finally {
     client.release();
@@ -112,7 +113,7 @@ sessionsRouter.post('/:id/apply', authMiddleware, async (req: Request, res: Resp
     ok(res, {});
   } catch (err: any) {
     if (err.code === '23505') ok(res, { message: 'Вы уже подали заявку' });
-    else { console.error('Apply error:', err.message); fail(res, 'SERVER_ERROR', 'Ошибка подачи заявки', 500); }
+    else { logger.error({ err }, 'Apply error'); fail(res, 'SERVER_ERROR', 'Ошибка подачи заявки', 500); }
   }
 });
 
@@ -152,7 +153,7 @@ sessionsRouter.patch('/:id/applications/:appId', authMiddleware, async (req: Req
     }
     ok(res, {});
   } catch (err: any) {
-    console.error('App patch error:', err.message);
+    logger.error({ err }, 'App patch error');
     fail(res, 'SERVER_ERROR', 'Ошибка обновления заявки', 500);
   }
 });
@@ -172,7 +173,7 @@ sessionsRouter.get('/my', authMiddleware, async (req: Request, res: Response) =>
     );
     ok(res, result.rows);
   } catch (err: any) {
-    console.error('Sessions my:', err.message);
+    logger.error({ err }, 'Sessions my');
     fail(res, 'SERVER_ERROR', 'Ошибка загрузки сессий', 500);
   }
 });
@@ -189,7 +190,7 @@ sessionsRouter.get('/:id/applications', authMiddleware, async (req: Request, res
     );
     ok(res, result.rows);
   } catch (err: any) {
-    console.error('Applications error:', err.message);
+    logger.error({ err }, 'Applications error');
     fail(res, 'SERVER_ERROR', 'Ошибка загрузки заявок', 500);
   }
 });
@@ -202,7 +203,7 @@ sessionsRouter.get('/:id/chat', authMiddleware, async (req: Request, res: Respon
     );
     ok(res, result.rows);
   } catch (err: any) {
-    console.error('Session chat error:', err.message);
+    logger.error({ err }, 'Session chat error');
     fail(res, 'SERVER_ERROR', 'Ошибка загрузки чата', 500);
   }
 });
@@ -222,7 +223,7 @@ sessionsRouter.post('/:id/chat', authMiddleware, async (req: Request, res: Respo
     );
     ok(res, result.rows[0], 201);
   } catch (err: any) {
-    console.error('Session chat send:', err.message);
+    logger.error({ err }, 'Session chat send');
     fail(res, 'SERVER_ERROR', 'Ошибка отправки сообщения', 500);
   }
 });

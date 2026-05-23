@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import { query } from '../config/database';
 import { authMiddleware, optionalAuth } from '../middleware/auth';
 import { ok, fail } from '../middleware/response';
+import { logger } from '../config/logger';
 
 export const followsRouter = Router();
 
@@ -21,7 +22,7 @@ followsRouter.post('/:username', authMiddleware, async (req: Request, res: Respo
     const count = await query('SELECT COUNT(*) FROM user_follows WHERE following_id = $1', [targetId]);
     ok(res, { following: true, followersCount: parseInt(count.rows[0].count) });
   } catch (err: any) {
-    console.error('Follow error:', err.message);
+    logger.error({ err }, 'Follow error');
     fail(res, 'SERVER_ERROR', 'Ошибка подписки', 500);
   }
 });
@@ -38,7 +39,7 @@ followsRouter.delete('/:username', authMiddleware, async (req: Request, res: Res
     const count = await query('SELECT COUNT(*) FROM user_follows WHERE following_id = $1', [targetId]);
     ok(res, { following: false, followersCount: parseInt(count.rows[0].count) });
   } catch (err: any) {
-    console.error('Unfollow error:', err.message);
+    logger.error({ err }, 'Unfollow error');
     fail(res, 'SERVER_ERROR', 'Ошибка отписки', 500);
   }
 });
@@ -70,7 +71,7 @@ followsRouter.get('/:username/status', optionalAuth, async (req: Request, res: R
       isFollowing,
     });
   } catch (err: any) {
-    console.error('Follow status error:', err.message);
+    logger.error({ err }, 'Follow status error');
     fail(res, 'SERVER_ERROR', 'Ошибка статуса подписки', 500);
   }
 });

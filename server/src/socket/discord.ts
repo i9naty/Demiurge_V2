@@ -2,6 +2,7 @@ import { Server, Socket } from 'socket.io';
 import { v4 as uuid } from 'uuid';
 import { query } from '../config/database';
 import { connectedUsers } from './shared';
+import { logger } from '../config/logger';
 
 export function registerDiscordHandlers(socket: Socket, io: Server, userId: string, username: string): void {
   socket.on('discord:join_server', (serverId: string) => { socket.join(`discord:${serverId}`); });
@@ -13,7 +14,7 @@ export function registerDiscordHandlers(socket: Socket, io: Server, userId: stri
   socket.on('discord:message', async (data: { channelId: string; content: string }) => {
     if (!data.content?.trim()) return;
     const msgId = uuid();
-    try { await query('INSERT INTO discord_messages (id, channel_id, user_id, content) VALUES ($1,$2,$3,$4)', [msgId, data.channelId, userId, data.content]); } catch (err) { console.error('Discord message error:', err instanceof Error ? err.message : err); }
+    try { await query('INSERT INTO discord_messages (id, channel_id, user_id, content) VALUES ($1,$2,$3,$4)', [msgId, data.channelId, userId, data.content]); } catch (err) { logger.error({ err }, 'Discord message error'); }
     io.to(`dch:${data.channelId}`).emit('discord:message', { id: msgId, channel_id: data.channelId, user_id: userId, username, content: data.content, created_at: new Date().toISOString() });
   });
 

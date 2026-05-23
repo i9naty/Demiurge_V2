@@ -1,5 +1,6 @@
 import * as fs from 'fs';
 import * as path from 'path';
+import { logger } from '../config/logger';
 
 export interface AssetInfo {
   id: string;
@@ -16,7 +17,7 @@ export function scanAssets(assetsDir: string): AssetInfo[] {
   assetMap = {};
 
   if (!fs.existsSync(assetsDir)) {
-    console.warn('⚠️ assets dir not found:', assetsDir);
+    logger.warn('assets dir not found: ' + assetsDir);
     return assetIndex;
   }
 
@@ -50,7 +51,7 @@ export function scanAssets(assetsDir: string): AssetInfo[] {
   }
 
   walk(assetsDir, '');
-  console.log(`📦 Scanned ${assetIndex.length} assets`);
+  logger.info(`Scanned ${assetIndex.length} assets`);
   return assetIndex;
 }
 

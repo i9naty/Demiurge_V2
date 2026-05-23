@@ -1,5 +1,6 @@
 import Redis from 'ioredis';
 import { env } from './env';
+import { logger } from './logger';
 
 let redis: Redis | null = null;
 
@@ -16,18 +17,18 @@ export function getRedis(): Redis | null {
       lazyConnect: true,
     });
 
-    redis.on('connect', () => console.log('🔴 Redis подключён'));
-    redis.on('error', (err: Error) => console.error('🔴 Redis error:', err.message));
+    redis.on('connect', () => logger.info('Redis подключён'));
+    redis.on('error', (err: Error) => logger.error({ err }, 'Redis error'));
 
     redis.connect().catch((err: Error) => {
-      console.warn('⚠️ Redis недоступен:', err.message);
+      logger.warn({ err }, 'Redis недоступен');
       redis = null;
     });
 
     return redis;
   } catch (err) {
     const message = err instanceof Error ? err.message : 'unknown error';
-    console.warn('⚠️ Redis недоступен — работаем без кэша:', message);
+    logger.warn({ err: message }, 'Redis недоступен — работаем без кэша');
     return null;
   }
 }
@@ -39,7 +40,7 @@ export async function cacheGet<T>(key: string): Promise<T | null> {
     const val = await r.get(key);
     return val ? JSON.parse(val) : null;
   } catch (err) {
-    console.error('cacheGet error:', err instanceof Error ? err.message : err);
+    logger.error({ err }, 'cacheGet error');
     return null;
   }
 }
@@ -50,7 +51,7 @@ export async function cacheSet(key: string, value: unknown, ttlSeconds = 300): P
   try {
     await r.set(key, JSON.stringify(value), 'EX', ttlSeconds);
   } catch (err) {
-    console.error('cacheSet error:', err instanceof Error ? err.message : err);
+    logger.error({ err }, 'cacheSet error');
   }
 }
 
@@ -60,7 +61,7 @@ export async function cacheDel(key: string): Promise<void> {
   try {
     await r.del(key);
   } catch (err) {
-    console.error('cacheDel error:', err instanceof Error ? err.message : err);
+    logger.error({ err }, 'cacheDel error');
   }
 }
 
@@ -77,7 +78,7 @@ export async function cacheInvalidate(pattern: string): Promise<void> {
       }
     } while (cursor !== '0');
   } catch (err) {
-    console.error('cacheInvalidate error:', err instanceof Error ? err.message : err);
+    logger.error({ err }, 'cacheInvalidate error');
   }
 }
 

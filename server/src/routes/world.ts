@@ -3,6 +3,7 @@ import { query } from '../config/database';
 import { authMiddleware } from '../middleware/auth';
 import { ok, fail } from '../middleware/response';
 import { generateWorld } from '../services/ai';
+import { logger } from '../config/logger';
 
 export const worldRouter = Router();
 
@@ -124,7 +125,7 @@ worldRouter.post('/:roomId/generate', authMiddleware, async (req: Request, res: 
     await query('UPDATE world_states SET width=$1, height=$2 WHERE room_id=$3', [w, h, roomId]);
     ok(res, { stats: { tiles: worldData.tiles?.length || 0, buildings: worldData.buildings?.length || 0, npcs: worldData.npcs?.length || 0, factions: worldData.factions?.length || 0, quests: worldData.quests?.length || 0 } });
   } catch (err: any) {
-    console.error('World generation error:', err.message);
+    logger.error({ err }, 'World generation error');
     fail(res, 'SERVER_ERROR', 'Ошибка генерации мира', 500);
   }
 });
@@ -147,7 +148,7 @@ worldRouter.get('/:roomId', authMiddleware, async (req: Request, res: Response) 
 
     ok(res, result.rows[0]);
   } catch (err: any) {
-    console.error('World state error:', err.message);
+    logger.error({ err }, 'World state error');
     fail(res, 'SERVER_ERROR', 'Ошибка получения мира', 500);
   }
 });
@@ -247,7 +248,7 @@ worldRouter.post('/:roomId/buildings', authMiddleware, async (req: Request, res:
 
     ok(res, result.rows[0], 201);
   } catch (err: any) {
-    console.error('Build error:', err.message);
+    logger.error({ err }, 'Build error');
     fail(res, 'SERVER_ERROR', 'Ошибка строительства', 500);
   }
 });

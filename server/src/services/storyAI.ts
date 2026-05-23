@@ -1,5 +1,6 @@
 import { callAI } from './ai';
 import { getAssetIdList } from './assetScanner';
+import { logger } from '../config/logger';
 
 const MASTER_SYSTEM = (params: {
   genre: string; setting: string; difficulty: string;
@@ -87,7 +88,7 @@ export async function generateWorld(params: {
       timeOfDay: (params.setting === 'dungeon' || params.setting === 'castle') ? 'night' : 'day',
     };
   } catch (err) {
-    console.error('generateWorld AI error:', err instanceof Error ? err.message : err);
+    logger.error({ err }, 'generateWorld AI error');
   }
 
   return null;
@@ -138,8 +139,8 @@ ${h || '(начало игры)'}
       ...json,
       description: json.narration || json.description,
     };
-  } catch (err) {
-    console.error('generateWorld AI error:', err instanceof Error ? err.message : err);
+    } catch (err) {
+    logger.error({ err }, 'processGameAction AI error');
   }
 
   return null;

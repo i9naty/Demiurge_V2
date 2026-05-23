@@ -1,4 +1,5 @@
 import { env } from '../config/env';
+import { logger } from '../config/logger';
 
 const AI_BASE = env.ROUTERAI_BASE_URL;
 const AI_KEY = env.ROUTERAI_API_KEY;
@@ -20,12 +21,12 @@ export async function callAI(messages: AIChatMessage[], maxTokens = 512, timeout
       signal: controller.signal,
     });
     clearTimeout(timeout);
-    if (!response.ok) { console.error('AI API error:', response.status, await response.text()); return '🤖 ИИ временно недоступен.'; }
+    if (!response.ok) { logger.error({ err: { status: response.status, body: await response.text() } }, 'AI API error'); return '🤖 ИИ временно недоступен.'; }
     const data: any = await response.json();
     return data.choices?.[0]?.message?.content || '🤖 Нет ответа от ИИ.';
   } catch (err: any) { 
-    if (err.name === 'AbortError') { console.error('AI call timeout'); return 'TIMEOUT'; }
-    console.error('AI call error:', err.message); return '🤖 Ошибка связи с ИИ.'; 
+    if (err.name === 'AbortError') { logger.warn('AI call timeout'); return 'TIMEOUT'; }
+    logger.error({ err }, 'AI call error'); return '🤖 Ошибка связи с ИИ.'; 
   }
 }
 
@@ -96,7 +97,7 @@ NPC (name русское, personality: дружелюбный/нейтральн
       return generateFallback(config.width, config.height, config.seed, config.biome, config.density, config.difficulty);
     }
   } catch (err: any) {
-    console.error('World gen AI error, using fallback:', err.message);
+    logger.error({ err }, 'World gen AI error, using fallback');
     return generateFallback(config.width, config.height, config.seed, config.biome, config.density, config.difficulty);
   }
 }

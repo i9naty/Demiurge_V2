@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import { v4 as uuid } from 'uuid';
 import { query } from '../config/database';
 import { authMiddleware } from '../middleware/auth';
+import { logger } from '../config/logger';
 
 export const gameRouter = Router();
 
@@ -36,7 +37,7 @@ gameRouter.post('/create', authMiddleware, async (req: Request, res: Response) =
 
     res.status(201).json({ id, code, settings });
   } catch (err: any) {
-    console.error('Game create error:', err.message);
+    logger.error({ err }, 'Game create error');
     res.status(500).json({ error: 'Ошибка создания лобби' });
   }
 });
@@ -129,7 +130,7 @@ gameRouter.get('/public', async (_req: Request, res: Response) => {
        ORDER BY gs.updated_at DESC LIMIT 20`
     );
     res.json(result.rows);
-  } catch (err) { console.error('Public games error:', err instanceof Error ? err.message : err); res.status(500).json({ success: false, error: { code: 'SERVER_ERROR', message: 'Ошибка загрузки игр' } }); }
+  } catch (err) { logger.error({ err }, 'Public games error'); res.status(500).json({ success: false, error: { code: 'SERVER_ERROR', message: 'Ошибка загрузки игр' } }); }
 });
 
 // Save game
@@ -187,5 +188,5 @@ gameRouter.get('/saves', authMiddleware, async (req: Request, res: Response) => 
       [req.user!.userId]
     );
     res.json(result.rows);
-  } catch (err) { console.error('Public games error:', err instanceof Error ? err.message : err); res.status(500).json({ success: false, error: { code: 'SERVER_ERROR', message: 'Ошибка загрузки игр' } }); }
+  } catch (err) { logger.error({ err }, 'Public games error'); res.status(500).json({ success: false, error: { code: 'SERVER_ERROR', message: 'Ошибка загрузки игр' } }); }
 });

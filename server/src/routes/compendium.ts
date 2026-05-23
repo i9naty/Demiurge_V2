@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import { query } from '../config/database';
 import { authMiddleware } from '../middleware/auth';
 import { ok, fail } from '../middleware/response';
+import { logger } from '../config/logger';
 
 export const compendiumRouter = Router();
 
@@ -26,7 +27,7 @@ compendiumRouter.get('/monsters', authMiddleware, async (req: Request, res: Resp
     const result = await query(sql, params);
     ok(res, result.rows);
   } catch (err) {
-    console.error('Compendium monsters error:', err);
+    logger.error({ err }, 'Compendium monsters error');
     fail(res, 'SERVER_ERROR', 'Ошибка поиска монстров', 500);
   }
 });
@@ -52,7 +53,7 @@ compendiumRouter.get('/spells', authMiddleware, async (req: Request, res: Respon
     const result = await query(sql, params);
     ok(res, result.rows);
   } catch (err) {
-    console.error('Compendium spells error:', err);
+    logger.error({ err }, 'Compendium spells error');
     fail(res, 'SERVER_ERROR', 'Ошибка поиска заклинаний', 500);
   }
 });
@@ -78,7 +79,7 @@ compendiumRouter.get('/items', authMiddleware, async (req: Request, res: Respons
     const result = await query(sql, params);
     ok(res, result.rows);
   } catch (err) {
-    console.error('Compendium items error:', err);
+    logger.error({ err }, 'Compendium items error');
     fail(res, 'SERVER_ERROR', 'Ошибка поиска предметов', 500);
   }
 });

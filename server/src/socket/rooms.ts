@@ -2,6 +2,7 @@ import { Server, Socket } from 'socket.io';
 import { v4 as uuid } from 'uuid';
 import { query } from '../config/database';
 import { connectedUsers, requireAuth } from './shared';
+import { logger } from '../config/logger';
 
 export function registerRoomHandlers(socket: Socket, io: Server, userId: string, username: string): void {
   // ─── КОМНАТЫ ───
@@ -28,17 +29,17 @@ export function registerRoomHandlers(socket: Socket, io: Server, userId: string,
     const w = Math.min(data.width || 64, 500);
     const h = Math.min(data.height || 64, 500);
     const tokenId = uuid();
-    try { await query('INSERT INTO tokens (id, room_id, name, image_url, x, y, width, height, created_by) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)', [tokenId, data.roomId, data.name, data.imageUrl || null, data.x, data.y, w, h, userId]); } catch (err) { console.error('Save token error:', err instanceof Error ? err.message : err); }
+    try { await query('INSERT INTO tokens (id, room_id, name, image_url, x, y, width, height, created_by) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)', [tokenId, data.roomId, data.name, data.imageUrl || null, data.x, data.y, w, h, userId]); } catch (err) { logger.error({ err }, 'Save token error'); }
     io.to(data.roomId).emit('token:created', { id: tokenId, roomId: data.roomId, name: data.name, imageUrl: data.imageUrl || null, x: data.x, y: data.y, width: w, height: h, createdBy: userId });
   });
   socket.on('token:move', (data: { roomId: string; tokenId: string; x: number; y: number }) => {
     if (!requireAuth(socket)) return;
-    try { query('UPDATE tokens SET x = $1, y = $2 WHERE id = $3', [data.x, data.y, data.tokenId]); } catch (err) { console.error('Save token move error:', err instanceof Error ? err.message : err); }
+    try { query('UPDATE tokens SET x = $1, y = $2 WHERE id = $3', [data.x, data.y, data.tokenId]); } catch (err) { logger.error({ err }, 'Save token move error'); }
     io.to(data.roomId).emit('token:moved', { tokenId: data.tokenId, x: data.x, y: data.y, movedBy: userId });
   });
   socket.on('token:delete', async (data: { roomId: string; tokenId: string }) => {
     if (!requireAuth(socket)) return;
-    try { await query('DELETE FROM tokens WHERE id = $1', [data.tokenId]); } catch (err) { console.error('Delete token error:', err instanceof Error ? err.message : err); }
+    try { await query('DELETE FROM tokens WHERE id = $1', [data.tokenId]); } catch (err) { logger.error({ err }, 'Delete token error'); }
     io.to(data.roomId).emit('token:deleted', { tokenId: data.tokenId });
   });
   socket.on('fog:update', (data: { roomId: string; fogData: unknown }) => {

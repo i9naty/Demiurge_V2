@@ -6,6 +6,7 @@ import { query } from '../config/database';
 import { env } from '../config/env';
 import { authPayloadSchema } from '../validators';
 import { connectedUsers } from './shared';
+import { logger } from '../config/logger';
 
 export { connectedUsers, SocketUser } from './shared';
 export { requireAuth } from './shared';
@@ -26,7 +27,7 @@ function setupAuth(io: Server): void {
           [guestId, guestName, `${guestId}@guest.demiurge`, passwordHash, guestName]
         );
       } catch (err) {
-        console.error('Guest socket auth error:', err instanceof Error ? err.message : err);
+        logger.error({ err }, 'Guest socket auth error');
       }
       connectedUsers.set(socket.id, { userId: guestId, username: guestName, isGuest: true, roomId: null, sessionId: null });
       return next();
@@ -63,7 +64,7 @@ export function setupSocket(io: Server) {
     const user = connectedUsers.get(socket.id);
     if (!user) { socket.disconnect(true); return; }
     const { userId, username } = user;
-    console.log(`🔌 ${username} подключился`);
+    logger.info(`${username} connected`);
 
     registerRoomHandlers(socket, io, userId, username);
     registerChatHandlers(socket, io, userId, username);
@@ -75,7 +76,7 @@ export function setupSocket(io: Server) {
 
     // ─── ДИСКОННЕКТ ───
     socket.on('disconnect', async () => {
-      console.log(`🔌 ${username} отключился`);
+      logger.info(`${username} disconnected`);
       const user = connectedUsers.get(socket.id);
       if (user?.roomId) {
         io.to(user.roomId).emit('room:user_left', { userId, username, timestamp: Date.now() });
@@ -88,7 +89,7 @@ export function setupSocket(io: Server) {
             [user.sessionId]
           );
           io.to(`game:${user.sessionId}`).emit('lobby:participants', participants.rows);
-        } catch (err) { console.error('Disconnect cleanup error:', err instanceof Error ? err.message : err); }
+        } catch (err) { logger.error({ err }, 'Disconnect cleanup error'); }
       }
       connectedUsers.delete(socket.id);
     });

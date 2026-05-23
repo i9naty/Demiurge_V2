@@ -3,6 +3,7 @@ import { v4 as uuid } from 'uuid';
 import { query } from '../config/database';
 import { authMiddleware } from '../middleware/auth';
 import { ok, fail } from '../middleware/response';
+import { logger } from '../config/logger';
 
 export const storyRouter = Router();
 
@@ -143,7 +144,7 @@ storyRouter.get('/public', async (_req: Request, res: Response) => {
        WHERE ss.status IN ('active', 'lobby') ORDER BY ss.created_at DESC LIMIT 10`
     );
     ok(res, result.rows);
-  } catch (err) { console.error('Public stories error:', err instanceof Error ? err.message : err); fail(res, 'SERVER_ERROR', 'Ошибка загрузки историй', 500); }
+  } catch (err) { logger.error({ err }, 'Public stories error'); fail(res, 'SERVER_ERROR', 'Ошибка загрузки историй', 500); }
 });
 
 storyRouter.post('/:id/end', authMiddleware, async (req: Request, res: Response) => {

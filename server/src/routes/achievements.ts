@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { query } from '../config/database';
 import { authMiddleware } from '../middleware/auth';
+import { logger } from '../config/logger';
 
 export const achievementsRouter = Router();
 
@@ -29,7 +30,7 @@ export async function seedAchievements() {
         [a.id, a.name, a.description, a.icon, a.category, a.condition_type, a.condition_value]
       );
         } catch (err) {
-          console.error('Insert user achievement error:', err instanceof Error ? err.message : err);
+          logger.error({ err }, 'Insert user achievement error');
         }
   }
 }
@@ -50,7 +51,7 @@ achievementsRouter.get('/', authMiddleware, async (req: Request, res: Response) 
     const stats = await query('SELECT * FROM player_stats WHERE user_id = $1', [req.user!.userId]);
     res.json({ achievements: result.rows, stats: stats.rows[0] || {} });
   } catch (err: any) {
-    console.error('Achievements error:', err.message);
+    logger.error({ err }, 'Achievements error');
     res.status(500).json({ success: false, error: { code: 'SERVER_ERROR', message: 'Ошибка загрузки достижений' } });
   }
 });
@@ -94,7 +95,7 @@ export async function checkAchievements(userId: string) {
           );
           newlyEarned.push(a.name);
     } catch (err) {
-      console.error('Seed achievement error:', err instanceof Error ? err.message : err);
+      logger.error({ err }, 'Seed achievement error');
     }
       }
     }

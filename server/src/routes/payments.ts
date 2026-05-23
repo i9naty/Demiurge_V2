@@ -3,6 +3,7 @@ import { query } from '../config/database';
 import { authMiddleware } from '../middleware/auth';
 import { ok, fail } from '../middleware/response';
 import { env } from '../config/env';
+import { logger } from '../config/logger';
 
 export const paymentsRouter = Router();
 
@@ -74,7 +75,7 @@ paymentsRouter.post('/subscribe', authMiddleware, async (req: Request, res: Resp
 
       if (!response.ok) {
         const errText = await response.text();
-        console.error('YooKassa API error:', response.status, errText);
+        logger.error({ err: { status: response.status, body: errText } }, 'YooKassa API error');
         fail(res, 'SERVER_ERROR', 'Ошибка платёжного шлюза', 502);
         return;
       }
@@ -106,7 +107,7 @@ paymentsRouter.post('/subscribe', authMiddleware, async (req: Request, res: Resp
       ok(res, { tier, message: 'Подписка активирована (демо-режим)' });
     }
   } catch (err: any) {
-    console.error('Payment error:', err.message);
+    logger.error({ err }, 'Payment error');
     fail(res, 'SERVER_ERROR', 'Ошибка создания платежа', 500);
   }
 });
