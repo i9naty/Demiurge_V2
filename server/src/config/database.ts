@@ -3,6 +3,8 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { env } from './env';
 
+const isDev = env.NODE_ENV === 'development';
+
 export const pool = new Pool({
   connectionString: env.DATABASE_URL,
   max: 20,
@@ -14,7 +16,7 @@ pool.on('error', (err: Error) => {
   console.error('🐘 PostgreSQL pool error:', err.message);
 });
 
-export async function query(text: string, params?: any[]) {
+export async function query(text: string, params?: unknown[]) {
   const client = await pool.connect();
   try {
     return await client.query(text, params);
@@ -28,9 +30,14 @@ export async function testConnection(): Promise<boolean> {
     await query('SELECT 1');
     console.log('🐘 PostgreSQL подключена');
     return true;
-  } catch {
-    console.warn('⚠️ PostgreSQL недоступна — работаем без БД');
-    return false;
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'unknown error';
+    if (isDev) {
+      console.warn('⚠️ PostgreSQL недоступна — работаем без БД');
+      return false;
+    }
+    console.error('❌ PostgreSQL недоступна:', message);
+    process.exit(1);
   }
 }
 
@@ -52,15 +59,21 @@ export async function runMigrations(): Promise<void> {
     for (const stmt of statements) {
       try {
         await query(stmt);
-      } catch (err: any) {
-        if (!err.message?.includes('already exists') && !err.message?.includes('duplicate')) {
-          console.warn('⚠️ Миграция:', err.message?.slice(0, 80));
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'unknown error';
+        if (!message.includes('already exists') && !message.includes('duplicate')) {
+          console.warn('⚠️ Миграция:', message.slice(0, 80));
         }
       }
     }
 
     console.log('📦 Миграции выполнены');
-  } catch (err: any) {
-    console.warn('⚠️ Ошибка миграций:', err.message?.slice(0, 100));
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'unknown error';
+    console.warn('⚠️ Ошибка миграций:', message.slice(0, 100));
   }
+}
+
+export async function disconnect(): Promise<void> {
+  await pool.end();
 }

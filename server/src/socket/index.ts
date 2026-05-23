@@ -8,6 +8,9 @@ import { generateWorldEvents, generateNPCResponse, callAI } from '../services/ai
 import { getAssetIdList } from '../services/assetScanner';
 import { generateWorld, generateFallbackWorld, processGameAction, smartFallback } from '../services/storyAI';
 import { incrementStat } from '../routes/achievements';
+import { authPayloadSchema } from '../validators';
+
+const BCRYPT_ROUNDS = 12;
 
 interface SocketUser {
   userId: string;
@@ -32,19 +35,28 @@ export function setupSocket(io: Server) {
       const guestId = uuid();
       const guestName = `Гость_${guestId.slice(0, 6)}`;
       try {
-        const passwordHash = await bcrypt.hash(guestId, 4);
+        const passwordHash = await bcrypt.hash(guestId, BCRYPT_ROUNDS);
         await query(
           `INSERT INTO users (id, username, email, password_hash, display_name, is_guest)
            VALUES ($1, $2, $3, $4, $5, true) ON CONFLICT (username) DO UPDATE SET last_seen_at = NOW()`,
           [guestId, guestName, `${guestId}@guest.demiurge`, passwordHash, guestName]
         );
-      } catch {}
-      (socket as any).userId = guestId; (socket as any).username = guestName;
+      } catch (err) {
+        console.error('Guest socket auth error:', err instanceof Error ? err.message : err);
+      }
+      connectedUsers.set(socket.id, { userId: guestId, username: guestName, isGuest: true, roomId: null, sessionId: null });
       return next();
     }
     try {
-      const payload = jwt.verify(token, env.JWT_SECRET) as any;
-      (socket as any).userId = payload.userId; (socket as any).username = payload.username;
+      const raw = jwt.verify(token, env.JWT_SECRET);
+      const payload = authPayloadSchema.parse(raw);
+      connectedUsers.set(socket.id, {
+        userId: payload.userId,
+        username: payload.username,
+        isGuest: payload.isGuest ?? false,
+        roomId: null,
+        sessionId: null,
+      });
       next();
     } catch {
       next(new Error('Недействительный токен'));
@@ -52,18 +64,21 @@ export function setupSocket(io: Server) {
   });
 
   io.on('connection', (socket: Socket) => {
-    const userId = (socket as any).userId;
-    const username = (socket as any).username;
+    const user = connectedUsers.get(socket.id);
+    if (!user) { socket.disconnect(true); return; }
+    const { userId, username } = user;
     console.log(`🔌 ${username} подключился`);
-    connectedUsers.set(socket.id, { userId, username, isGuest: username.startsWith('Гость_'), roomId: null, sessionId: null });
 
     // ─── КОМНАТЫ ───
     socket.on('room:join', async (roomId: string) => {
       socket.join(roomId);
-      const user = connectedUsers.get(socket.id); if (user) user.roomId = roomId;
+      const u = connectedUsers.get(socket.id); if (u) u.roomId = roomId;
       io.to(roomId).emit('room:user_joined', { userId, username, timestamp: Date.now() });
       const sockets = await io.in(roomId).fetchSockets();
-      io.to(roomId).emit('room:participants', sockets.map(s => ({ userId: (s as any).userId, username: (s as any).username })));
+      io.to(roomId).emit('room:participants', sockets.map(s => {
+        const su = connectedUsers.get(s.id);
+        return { userId: su?.userId, username: su?.username };
+      }));
     });
     socket.on('room:leave', (roomId: string) => {
       socket.leave(roomId);
@@ -100,8 +115,11 @@ export function setupSocket(io: Server) {
         const parts = processedContent.slice(processedContent.startsWith('/w ') ? 3 : 9).match(/^@?(\S+)\s(.+)/s);
         if (parts) {
           const targetName = parts[1], whisperMsg = parts[2];
-          const targetSockets = (await io.fetchSockets()).filter((s: any) => s.username === targetName || (s as any).userId?.startsWith(targetName));
-          targetSockets.forEach((s: any) => s.emit('chat:whisper', { from: username, content: whisperMsg, roomId }));
+          const targetSockets = (await io.fetchSockets()).filter(s => {
+            const su = connectedUsers.get(s.id);
+            return su?.username === targetName || su?.userId?.startsWith(targetName);
+          });
+          targetSockets.forEach(s => s.emit('chat:whisper', { from: username, content: whisperMsg, roomId }));
           socket.emit('chat:whisper', { from: username, to: targetName, content: whisperMsg, roomId });
         }
       }
@@ -171,7 +189,7 @@ export function setupSocket(io: Server) {
       try { await query('INSERT INTO direct_messages (id, sender_id, receiver_id, content) VALUES ($1,$2,$3,$4)', [msgId, userId, data.to, data.content]); } catch {}
       const payload = { id: msgId, sender_id: userId, sender_name: username, receiver_id: data.to, content: data.content, created_at: new Date().toISOString() };
       socket.emit('dm:message', payload);
-      (await io.fetchSockets()).forEach(s => { if ((s as any).userId === data.to) s.emit('dm:message', payload); });
+      (await io.fetchSockets()).forEach(s => { if (connectedUsers.get(s.id)?.userId === data.to) s.emit('dm:message', payload); });
     });
 
     // ─── DISCORD ───
@@ -193,7 +211,10 @@ export function setupSocket(io: Server) {
       socket.join(`voice:${data.channelId}`);
       socket.to(`voice:${data.channelId}`).emit('voice:user_joined', { userId, username, peerId: socket.id });
       const sockets = await io.in(`voice:${data.channelId}`).fetchSockets();
-      io.to(`voice:${data.channelId}`).emit('voice:participants', sockets.map(s => ({ userId: (s as any).userId, username: (s as any).username, peerId: s.id })));
+      io.to(`voice:${data.channelId}`).emit('voice:participants', sockets.map(s => {
+        const su = connectedUsers.get(s.id);
+        return { userId: su?.userId, username: su?.username, peerId: s.id };
+      }));
     });
     socket.on('voice:leave', (channelId: string) => { socket.leave(`voice:${channelId}`); socket.to(`voice:${channelId}`).emit('voice:user_left', { userId, username }); });
     socket.on('voice:signal', (data: { to: string; signal: any }) => {
@@ -471,7 +492,7 @@ export function setupSocket(io: Server) {
       if (!requireAuth(socket)) return;
       const room = await query('SELECT owner_id FROM rooms WHERE id = $1', [data.roomId]);
       if (room.rows.length === 0 || room.rows[0].owner_id !== userId) return; // Only owner can kick
-      const targetSockets = (await io.fetchSockets()).filter(s => (s as any).userId === data.userId);
+      const targetSockets = (await io.fetchSockets()).filter(s => connectedUsers.get(s.id)?.userId === data.userId);
       targetSockets.forEach(s => {
         s.emit('room:kicked', { roomId: data.roomId });
         s.leave(data.roomId);

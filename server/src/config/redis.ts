@@ -17,15 +17,17 @@ export function getRedis(): Redis | null {
     });
 
     redis.on('connect', () => console.log('🔴 Redis подключён'));
-    redis.on('error', () => {});
+    redis.on('error', (err: Error) => console.error('🔴 Redis error:', err.message));
 
-    redis.connect().catch(() => {
+    redis.connect().catch((err: Error) => {
+      console.warn('⚠️ Redis недоступен:', err.message);
       redis = null;
     });
 
     return redis;
-  } catch {
-    console.warn('⚠️ Redis недоступен — работаем без кэша');
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'unknown error';
+    console.warn('⚠️ Redis недоступен — работаем без кэша:', message);
     return null;
   }
 }
@@ -36,7 +38,8 @@ export async function cacheGet<T>(key: string): Promise<T | null> {
   try {
     const val = await r.get(key);
     return val ? JSON.parse(val) : null;
-  } catch {
+  } catch (err) {
+    console.error('cacheGet error:', err instanceof Error ? err.message : err);
     return null;
   }
 }
@@ -46,7 +49,9 @@ export async function cacheSet(key: string, value: unknown, ttlSeconds = 300): P
   if (!r) return;
   try {
     await r.set(key, JSON.stringify(value), 'EX', ttlSeconds);
-  } catch {}
+  } catch (err) {
+    console.error('cacheSet error:', err instanceof Error ? err.message : err);
+  }
 }
 
 export async function cacheDel(key: string): Promise<void> {
@@ -54,14 +59,31 @@ export async function cacheDel(key: string): Promise<void> {
   if (!r) return;
   try {
     await r.del(key);
-  } catch {}
+  } catch (err) {
+    console.error('cacheDel error:', err instanceof Error ? err.message : err);
+  }
 }
 
 export async function cacheInvalidate(pattern: string): Promise<void> {
   const r = getRedis();
   if (!r) return;
   try {
-    const keys = await r.keys(pattern);
-    if (keys.length > 0) await r.del(...keys);
-  } catch {}
+    let cursor = '0';
+    do {
+      const [nextCursor, keys] = await r.scan(cursor, 'MATCH', pattern, 'COUNT', 100);
+      cursor = nextCursor;
+      if (keys.length > 0) {
+        await r.del(...keys);
+      }
+    } while (cursor !== '0');
+  } catch (err) {
+    console.error('cacheInvalidate error:', err instanceof Error ? err.message : err);
+  }
+}
+
+export async function redisDisconnect(): Promise<void> {
+  if (redis) {
+    await redis.quit().catch(() => {});
+    redis = null;
+  }
 }

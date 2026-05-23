@@ -7,7 +7,8 @@ import rateLimit from 'express-rate-limit';
 import { createServer } from 'http';
 import { Server as SocketIOServer } from 'socket.io';
 import { env } from './config/env';
-import { testConnection, runMigrations } from './config/database';
+import { testConnection, runMigrations, disconnect as dbDisconnect, pool } from './config/database';
+import { getRedis, redisDisconnect } from './config/redis';
 import { scanAssets, getAssetIndex } from './services/assetScanner';
 import { authRouter } from './routes/auth';
 import { roomsRouter } from './routes/rooms';
@@ -27,6 +28,8 @@ const isDev = env.NODE_ENV === 'development';
 const app = express();
 const httpServer = createServer(app);
 
+const SHUTDOWN_TIMEOUT = 30_000;
+
 // Socket.io
 const io = new SocketIOServer(httpServer, {
   cors: {
@@ -34,8 +37,8 @@ const io = new SocketIOServer(httpServer, {
     methods: ['GET', 'POST'],
     credentials: true,
   },
-  pingTimeout: 60000,
-  pingInterval: 25000,
+  pingTimeout: 60_000,
+  pingInterval: 25_000,
 });
 
 // Middleware
@@ -54,23 +57,25 @@ app.use(helmet({
 }));
 app.use(cors({ origin: isDev ? true : env.CORS_ORIGINS, credentials: true }));
 
+const FIFTEEN_MINUTES = 15 * 60 * 1000;
+
 const apiLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
+  windowMs: FIFTEEN_MINUTES,
   max: isDev ? 10000 : 100,
   standardHeaders: true,
   legacyHeaders: false,
-  message: { error: 'Слишком много запросов, попробуйте позже' },
+  message: { success: false, error: { code: 'RATE_LIMIT', message: 'Слишком много запросов, попробуйте позже' } },
 });
 
 const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: isDev ? 10000 : 30,
+  windowMs: FIFTEEN_MINUTES,
+  max: isDev ? 10000 : 20,
   standardHeaders: true,
   legacyHeaders: false,
-  message: { error: 'Слишком много попыток, попробуйте позже' },
+  message: { success: false, error: { code: 'RATE_LIMIT', message: 'Слишком много попыток, попробуйте позже' } },
 });
 
-app.use(morgan('dev'));
+app.use(morgan(isDev ? 'dev' : 'combined'));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
@@ -96,8 +101,34 @@ app.use('/api/story', apiLimiter, storyRouter);
 app.use('/api/game', apiLimiter, gameRouter);
 
 // Здоровье сервера
-app.get('/api/health', (_req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+app.get('/api/health', async (_req, res) => {
+  const status: Record<string, string> = { server: 'ok' };
+
+  try {
+    const r = getRedis();
+    if (r) {
+      await r.ping();
+      status.redis = 'ok';
+    } else {
+      status.redis = 'not_connected';
+    }
+  } catch {
+    status.redis = 'error';
+  }
+
+  try {
+    await pool.query('SELECT 1');
+    status.database = 'ok';
+  } catch {
+    status.database = 'error';
+  }
+
+  const allOk = Object.values(status).every((v) => v === 'ok');
+  res.status(allOk ? 200 : 503).json({
+    status: allOk ? 'ok' : 'degraded',
+    components: status,
+    timestamp: new Date().toISOString(),
+  });
 });
 
 // API для ассетов
@@ -113,8 +144,60 @@ app.get('*', (_req, res) => {
 // Сокеты
 setupSocket(io);
 
+// Graceful shutdown
+function setupShutdown() {
+  const cleanup = async (signal: string) => {
+    console.log(`\n🛑 Получен сигнал ${signal}, начинаем graceful shutdown...`);
+
+    let forceExit = setTimeout(() => {
+      console.error('❌ Принудительное завершение по таймауту');
+      process.exit(1);
+    }, SHUTDOWN_TIMEOUT);
+    forceExit.unref();
+
+    try {
+      // 1. Закрываем HTTP сервер (перестаём принимать новые запросы)
+      await new Promise<void>((resolve) => {
+        httpServer.close(() => resolve());
+      });
+
+      // 2. Закрываем WebSocket соединения
+      await io.close();
+
+      // 3. Отключаем БД
+      await dbDisconnect();
+
+      // 4. Отключаем Redis
+      await redisDisconnect();
+
+      clearTimeout(forceExit);
+      console.log('✅ Graceful shutdown завершён');
+      process.exit(0);
+    } catch (err) {
+      clearTimeout(forceExit);
+      console.error('❌ Ошибка при shutdown:', err instanceof Error ? err.message : err);
+      process.exit(1);
+    }
+  };
+
+  process.on('SIGTERM', () => cleanup('SIGTERM'));
+  process.on('SIGINT', () => cleanup('SIGINT'));
+  process.on('SIGQUIT', () => cleanup('SIGQUIT'));
+
+  process.on('uncaughtException', (err) => {
+    console.error('💥 Uncaught exception:', err);
+    cleanup('uncaughtException');
+  });
+
+  process.on('unhandledRejection', (reason) => {
+    console.error('💥 Unhandled rejection:', reason);
+  });
+}
+
 // Старт
 async function start() {
+  setupShutdown();
+
   await testConnection();
   await runMigrations();
   await seedAchievements();
@@ -134,6 +217,4 @@ async function start() {
   });
 }
 
-start().catch(console.error);
-
-export { io };
+start();
