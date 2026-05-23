@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useStore } from '../store';
+import { apiGet, apiPost } from '../utils/api';
 import {
   Sparkles, Swords, Skull, Zap, Trees, Mountain, Building2, Ghost, Moon,
   ArrowRight, ArrowLeft, Loader2, Users, Copy, Check, Heart, Shield,
@@ -81,8 +82,6 @@ export function StoryCreatePage() {
   const [showSaves, setShowSaves] = useState(false);
   const [loadingSave, setLoadingSave] = useState<string | null>(null);
 
-  const hdrs = { Authorization: `Bearer ${token || ''}` };
-
   useEffect(() => {
     if (!socket) return;
     socket.on('lobby:participants', setParticipants);
@@ -93,33 +92,26 @@ export function StoryCreatePage() {
     if (!token) return;
     setCreating(true);
     try {
-      const res = await fetch('/api/game/create', {
-        method: 'POST', headers: { 'Content-Type': 'application/json', ...hdrs },
-        body: JSON.stringify({ genre, setting, difficulty, playTime, nsfw, storyPrompt, isPublic }),
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setSessionId(data.id);
-        setInviteCode(data.code);
-        setIsOwner(true);
-        if (socket) {
-          socket.emit('lobby:join', data.id);
-          socket.emit('lobby:update', {
-            sessionId: data.id,
-            characterData: { name: charName || user?.username, race: charRace, class: charClass, prompt: charPrompt },
-          });
-        }
-        setStep(4);
+      const data = await apiPost('/game/create', { genre, setting, difficulty, playTime, nsfw, storyPrompt, isPublic });
+      setSessionId(data.id);
+      setInviteCode(data.code);
+      setIsOwner(true);
+      if (socket) {
+        socket.emit('lobby:join', data.id);
+        socket.emit('lobby:update', {
+          sessionId: data.id,
+          characterData: { name: charName || user?.username, race: charRace, class: charClass, prompt: charPrompt },
+        });
       }
+      setStep(4);
     } catch {}
     setCreating(false);
   };
 
   const handleJoin = async (code: string) => {
     if (!code.trim() || !token) return;
-    const res = await fetch(`/api/game/join/${code.trim().toUpperCase()}`, { method: 'POST', headers: hdrs });
-    if (res.ok) {
-      const data = await res.json();
+    try {
+      const data = await apiPost(`/game/join/${code.trim().toUpperCase()}`);
       setSessionId(data.id);
       if (socket) {
         socket.emit('lobby:join', data.id);
@@ -129,7 +121,7 @@ export function StoryCreatePage() {
         });
       }
       setStep(4);
-    }
+    } catch {}
   };
 
   const updateCharacter = () => {
@@ -150,8 +142,8 @@ export function StoryCreatePage() {
   const loadSavedGames = async () => {
     if (!token) return;
     try {
-      const res = await fetch('/api/game/saves', { headers: hdrs });
-      if (res.ok) setSaves(await res.json());
+      const saves = await apiGet('/game/saves');
+      setSaves(saves);
     } catch {}
   };
 
@@ -159,14 +151,8 @@ export function StoryCreatePage() {
     if (!token) return;
     setLoadingSave(save.id);
     try {
-      const res = await fetch('/api/game/load', {
-        method: 'POST', headers: { 'Content-Type': 'application/json', ...hdrs },
-        body: JSON.stringify({ saveId: save.id }),
-      });
-      if (res.ok) {
-        const data = await res.json();
-        navigate(`/story/${data.sessionId}`);
-      }
+      const data = await apiPost('/game/load', { saveId: save.id });
+      navigate(`/story/${data.sessionId}`);
     } catch {}
     setLoadingSave(null);
   };

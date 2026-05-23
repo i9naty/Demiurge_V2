@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useStore } from '../store';
+import { apiGet } from '../utils/api';
 import {
   ArrowLeft, Heart, Package, Sparkles, Save, Map, Users, Zap,
   Sword, Shield, Eye, Moon, Sun, Loader2,
@@ -52,15 +53,13 @@ export function StoryGamePage() {
   const fogCanvas = useRef<HTMLCanvasElement | null>(null);
   const centered = useRef(false);
   const loaded = useRef(false);
-  const hdrs = { Authorization: `Bearer ${token || ''}` };
-
   const me = tokens.find(t => t.id === user?.id) || tokens.find(t => t.type === 'player');
   const px = me?.x ?? 20;
   const py = me?.y ?? 20;
 
   // Load assets
   useEffect(() => {
-    fetch('/api/assets').then(r => r.json()).then((list: any[]) => {
+    apiGet('/assets').then((list: any[]) => {
       const m: Record<string, string> = {};
       list.forEach((a: any) => { m[a.id] = a.path; });
       setAssets(m);
@@ -72,7 +71,7 @@ export function StoryGamePage() {
   useEffect(() => {
     if (!sessionId || !token || loaded.current) return;
     loaded.current = true;
-    fetch(`/api/game/${sessionId}/lobby`, { headers: hdrs }).then(r => r.json()).then(d => {
+    apiGet(`/game/${sessionId}/lobby`).then(d => {
       if (d.status === 'active' && d.world_state) {
         const ws = d.world_state; const ss = d.story_state || {};
         setMap(Array.isArray(ws.map) ? ws.map : []);

@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useStore } from '../store';
+import { apiGet, apiPost, apiPatch, apiDelete } from '../utils/api';
 import { User, Calendar, MessageCircle, Clock, Heart, Globe, Dices, Copy, Play, Plus, Camera, Edit2, Check, X, Users2, UserPlus, UserMinus, Trophy, Zap } from 'lucide-react';
 
 interface Profile {
@@ -33,11 +34,11 @@ export function ProfilePage() {
 
   useEffect(() => {
     if (!username) return;
-    fetch(`/api/social/profile/${username}`).then((r) => r.json()).then((d) => { if (d && d.profile) setProfile(d); }).catch(() => {});
-    fetch(`/api/follows/${username}/status`).then((r) => r.json()).then((d) => { if (d && typeof d === 'object') setFollowInfo(d); }).catch(() => {});
+    apiGet(`/social/profile/${username}`).then((d) => { if (d && d.profile) setProfile(d); }).catch(() => {});
+    apiGet(`/follows/${username}/status`).then((d) => { if (d && typeof d === 'object') setFollowInfo(d); }).catch(() => {});
     if (isOwnProfile && token) {
-      fetch('/api/rooms/my', { headers: { Authorization: `Bearer ${token}` } }).then((r) => r.json()).then((d) => { if (Array.isArray(d)) setRooms(d); }).catch(() => {});
-      fetch('/api/achievements', { headers: { Authorization: `Bearer ${token}` } }).then((r) => r.json()).then((d) => { if (d && Array.isArray(d.achievements)) setAchievements(d.achievements); }).catch(() => {});
+      apiGet('/rooms/my').then((d) => { if (Array.isArray(d)) setRooms(d); }).catch(() => {});
+      apiGet('/achievements').then((d) => { if (d && Array.isArray(d.achievements)) setAchievements(d.achievements); }).catch(() => {});
     }
   }, [username, isOwnProfile, token]);
 
@@ -47,12 +48,9 @@ export function ProfilePage() {
     const r = new FileReader();
     r.onload = async (ev) => {
       const dataUrl = ev.target?.result as string;
-      const res = await fetch('/api/auth/avatar', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }, body: JSON.stringify({ imageData: dataUrl }) });
-      if (res.ok) {
-        const { avatarUrl } = await res.json();
-        setProfile((prev) => prev ? { ...prev, profile: { ...prev.profile, avatar_url: avatarUrl } } : prev);
-        useStore.setState({ user: { ...user!, avatarUrl } });
-      }
+      const { avatarUrl } = await apiPost('/auth/avatar', { imageData: dataUrl });
+      setProfile((prev) => prev ? { ...prev, profile: { ...prev.profile, avatar_url: avatarUrl } } : prev);
+      useStore.setState({ user: { ...user!, avatarUrl } });
     };
     r.readAsDataURL(file);
     e.target.value = '';
@@ -65,7 +63,7 @@ export function ProfilePage() {
   };
   const saveBio = async () => {
     if (!token) return;
-    await fetch('/api/auth/me', { method: 'PATCH', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }, body: JSON.stringify({ bio: bioText }) });
+    await apiPatch('/auth/me', { bio: bioText });
     setProfile((prev) => prev ? { ...prev, profile: { ...prev.profile, bio: bioText } } : prev);
     setEditingBio(false);
     setBioSaved(true);
@@ -75,12 +73,11 @@ export function ProfilePage() {
   const toggleFollow = async () => {
     if (!token || !followInfo) return;
     setFollowLoading(true);
-    const method = followInfo.isFollowing ? 'DELETE' : 'POST';
-    const res = await fetch(`/api/follows/${profile!.profile.username}`, { method, headers: { Authorization: `Bearer ${token}` } });
-    if (res.ok) {
-      const d = await res.json();
+    try {
+      const fn = followInfo.isFollowing ? apiDelete : apiPost;
+      const d = await fn(`/follows/${profile!.profile.username}`);
       setFollowInfo((prev) => prev ? { ...prev, isFollowing: d.following, followersCount: d.followersCount } : prev);
-    }
+    } catch {}
     setFollowLoading(false);
   };
 

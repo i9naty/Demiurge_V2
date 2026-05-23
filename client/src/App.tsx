@@ -2,6 +2,7 @@ import { Suspense, lazy } from 'react';
 import { Routes, Route, useLocation, useNavigate } from 'react-router-dom';
 import { useEffect, Component, ReactNode, useState, useRef } from 'react';
 import { useStore } from './store';
+import { apiGet } from './utils/api';
 import { Navbar } from './components/layout/Navbar';
 import { ParticleBackground } from './components/ui/ParticleBackground';
 import { DMPanel } from './components/social/DMPanel';
@@ -82,11 +83,9 @@ function AppRoutes() {
 
   useEffect(() => {
     if (token && !user) {
-      fetch('/api/auth/me', { headers: { Authorization: `Bearer ${token}` } })
-        .then((r) => r.ok ? r.json() : null)
+      apiGet('/auth/me')
         .then((data) => {
-          if (data?.success && data.data?.id) { useStore.setState({ user: data.data }); connectSocket(); }
-          else if (data?.id) { useStore.setState({ user: data }); connectSocket(); }
+          if (data?.id) { useStore.setState({ user: data }); connectSocket(); }
         })
         .catch(() => {});
     }

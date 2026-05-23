@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useStore } from '../store';
+import { apiGet, apiPost, apiPatch } from '../utils/api';
 import { Calendar, Clock, Users, ScrollText, Send, Plus, X, Check, User, MessageCircle, CheckCheck, XCircle } from 'lucide-react';
 
 interface Session {
@@ -24,16 +25,16 @@ export function SessionsPage() {
   const [appsData, setAppsData] = useState<Record<string, any[]>>({});
 
   const loadSessions = () => {
-    fetch('/api/sessions').then((r) => r.json()).then((d) => { if (Array.isArray(d)) setSessions(d); }).catch(() => {});
+    apiGet('/sessions').then((d) => { if (Array.isArray(d)) setSessions(d); }).catch(() => {});
     if (user && token) {
-      fetch('/api/sessions/my', { headers: { Authorization: `Bearer ${token}` } })
-        .then((r) => r.json()).then((data) => {
+      apiGet('/sessions/my')
+        .then((data) => {
           if (!Array.isArray(data)) return;
           setMySessions(data);
           data.forEach((s: Session) => {
             if (s.master_id === user.id) {
-              fetch(`/api/sessions/${s.id}/applications`, { headers: { Authorization: `Bearer ${token}` } })
-                .then((r) => r.json()).then((apps) => {
+              apiGet(`/sessions/${s.id}/applications`)
+                .then((apps) => {
                   if (Array.isArray(apps)) setAppsData((prev) => ({ ...prev, [s.id]: apps }));
                 }).catch(() => {});
             }
@@ -50,32 +51,37 @@ export function SessionsPage() {
     setActiveChat(sessionId);
     setChatMsgs([]);
     try {
-      const res = await fetch(`/api/sessions/${sessionId}/chat`);
-      if (res.ok) {
-        const data = await res.json();
-        if (Array.isArray(data)) setChatMsgs(data);
-      }
+      const data = await apiGet(`/sessions/${sessionId}/chat`);
+      if (Array.isArray(data)) setChatMsgs(data);
     } catch {}
   };
   const sendChat = async () => {
     if (!chatInput.trim() || !activeChat || !token) return;
-    const res = await fetch(`/api/sessions/${activeChat}/chat`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }, body: JSON.stringify({ content: chatInput }) });
-    if (res.ok) { const m = await res.json(); setChatMsgs((prev) => [...prev, m]); setChatInput(''); }
+    try {
+      const m = await apiPost(`/sessions/${activeChat}/chat`, { content: chatInput });
+      setChatMsgs((prev) => [...prev, m]); setChatInput('');
+    } catch {}
   };
   const handleCreate = async () => {
     if (!title || !schedAt || !token) return;
-    const res = await fetch('/api/sessions', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }, body: JSON.stringify({ title, description: desc, scheduledAt: schedAt, maxPlayers: maxPl, system }) });
-    if (res.ok) { const s = await res.json(); setSessions((prev) => [s, ...prev]); setMySessions((prev) => [s, ...prev]); setShowCreate(false); setTitle(''); setDesc(''); setSchedAt(''); setMaxPl(4); }
+    try {
+      const s = await apiPost('/sessions', { title, description: desc, scheduledAt: schedAt, maxPlayers: maxPl, system });
+      setSessions((prev) => [s, ...prev]); setMySessions((prev) => [s, ...prev]); setShowCreate(false); setTitle(''); setDesc(''); setSchedAt(''); setMaxPl(4);
+    } catch {}
   };
   const apply = async (sessionId: string) => {
     if (!token) return;
-    await fetch(`/api/sessions/${sessionId}/apply`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }, body: JSON.stringify({ message: 'Хочу участвовать!' }) });
-    setApplied((prev) => new Set([...prev, sessionId]));
+    try {
+      await apiPost(`/sessions/${sessionId}/apply`, { message: 'Хочу участвовать!' });
+      setApplied((prev) => new Set([...prev, sessionId]));
+    } catch {}
   };
   const handleApplication = async (sessionId: string, appId: string, status: string) => {
     if (!token) return;
-    await fetch(`/api/sessions/${sessionId}/applications/${appId}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }, body: JSON.stringify({ status }) });
-    loadSessions();
+    try {
+      await apiPatch(`/sessions/${sessionId}/applications/${appId}`, { status });
+      loadSessions();
+    } catch {}
   };
 
   return (

@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useStore } from '../store';
+import { apiGet, apiPost, apiPatch, apiDelete } from '../utils/api';
 import { VoiceService } from '../utils/voiceService';
 import { VoicePanel } from '../components/vtt/VoicePanel';
 import { GameFinder } from '../components/tavern/GameFinder';
@@ -85,8 +86,7 @@ export function TavernPage() {
     const handler = async (e: any) => {
       await loadServers();
       // servers state update is async, need to find from current state
-      const fetched = await fetch('/api/discord/servers', { headers: { Authorization: `Bearer ${token}` } });
-      const list = await fetched.json();
+      const list = await apiGet('/discord/servers');
       if (Array.isArray(list)) {
         setServers(list);
         const svr = list.find((s: Server) => s.id === e.detail.serverId);
@@ -98,27 +98,28 @@ export function TavernPage() {
   }, [token]);
 
   const loadServers = async () => {
-    const r = await fetch('/api/discord/servers', { headers: { Authorization: `Bearer ${token}` } });
-    const d = await r.json();
-    if (Array.isArray(d)) setServers(d);
+    try {
+      const d = await apiGet('/discord/servers');
+      if (Array.isArray(d)) setServers(d);
+    } catch {}
   };
 
   // Load servers
   useEffect(() => {
     if (!token) return;
     loadServers();
-    fetch('/api/dm/conversations', { headers: { Authorization: `Bearer ${token}` } })
-      .then((r) => r.json()).then((d) => { if (Array.isArray(d)) setDmConvs(d); }).catch(() => {});
+    apiGet('/dm/conversations')
+      .then((d) => { if (Array.isArray(d)) setDmConvs(d); }).catch(() => {});
   }, [token]);
 
   // Load channels + members when server selected
   useEffect(() => {
     if (!activeServer || !token) return;
     if (socket) { socket.emit('discord:join_server', activeServer.id); socket.emit('presence:online'); }
-    fetch(`/api/discord/servers/${activeServer.id}/channels`, { headers: { Authorization: `Bearer ${token}` } })
-      .then((r) => r.json()).then((d) => { if (Array.isArray(d)) setChannels(d); }).catch(() => {});
-    fetch(`/api/discord/servers/${activeServer.id}/members`, { headers: { Authorization: `Bearer ${token}` } })
-      .then((r) => r.json()).then((d) => { if (Array.isArray(d)) setMembers(d); }).catch(() => {});
+    apiGet(`/discord/servers/${activeServer.id}/channels`)
+      .then((d) => { if (Array.isArray(d)) setChannels(d); }).catch(() => {});
+    apiGet(`/discord/servers/${activeServer.id}/members`)
+      .then((d) => { if (Array.isArray(d)) setMembers(d); }).catch(() => {});
     if (socket) socket.emit('discord:join_server', activeServer.id);
     setActiveChannel(null);
     setMessages([]);
@@ -128,16 +129,16 @@ export function TavernPage() {
   useEffect(() => {
     if (!activeChannel || activeChannel.type !== 'text' || !token) return;
     setUnreadChannels(prev => { const next = new Set(prev); next.delete(activeChannel.id); return next; });
-    fetch(`/api/discord/channels/${activeChannel.id}/messages`, { headers: { Authorization: `Bearer ${token}` } })
-      .then((r) => r.json()).then((d) => { if (Array.isArray(d)) setMessages(d); }).catch(() => {});
+    apiGet(`/discord/channels/${activeChannel.id}/messages`)
+      .then((d) => { if (Array.isArray(d)) setMessages(d); }).catch(() => {});
     if (socket) socket.emit('discord:join_channel', { serverId: activeServer?.id, channelId: activeChannel.id });
   }, [activeChannel?.id, token]);
 
   // Load DM messages
   useEffect(() => {
     if (!activeDm || !token) return;
-    fetch(`/api/dm/${activeDm.id}`, { headers: { Authorization: `Bearer ${token}` } })
-      .then((r) => r.json()).then((d) => { if (Array.isArray(d)) setDmMessages(d); }).catch(() => {});
+    apiGet(`/dm/${activeDm.id}`)
+      .then((d) => { if (Array.isArray(d)) setDmMessages(d); }).catch(() => {});
     // Mark as active
     setActiveServer(null);
     setActiveChannel(null);
@@ -159,8 +160,8 @@ export function TavernPage() {
     };
     const onDm = (m: DMMsg) => {
       if (activeDm && (m.sender_id === activeDm.id || m.receiver_id === activeDm.id)) setDmMessages((prev) => [...prev, m]);
-      fetch('/api/dm/conversations', { headers: { Authorization: `Bearer ${token}` } })
-        .then((r) => r.json()).then((d) => { if (Array.isArray(d)) setDmConvs(d); }).catch(() => {});
+      apiGet('/dm/conversations')
+        .then((d) => { if (Array.isArray(d)) setDmConvs(d); }).catch(() => {});
     };
     socket.on('discord:message', onMsg);
     socket.on('dm:message', onDm);
@@ -193,52 +194,68 @@ export function TavernPage() {
   };
   const createServer = async () => {
     if (!serverName.trim() || !token) return;
-    const res = await fetch('/api/discord/servers', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }, body: JSON.stringify({ name: serverName }) });
-    if (res.ok) { const s = await res.json(); setServers((prev) => [...prev, s]); setShowCreateServer(false); setServerName(''); setActiveServer(s); setActiveTab('servers'); }
+    try {
+      const s = await apiPost('/discord/servers', { name: serverName });
+      setServers((prev) => [...prev, s]); setShowCreateServer(false); setServerName(''); setActiveServer(s); setActiveTab('servers');
+    } catch {}
   };
   const joinServer = async () => {
     if (!inviteCode.trim() || !token) return;
-    const res = await fetch(`/api/discord/servers/join/${inviteCode.trim().toUpperCase()}`, { method: 'POST', headers: { Authorization: `Bearer ${token}` } });
-    if (res.ok) { const s = await res.json(); setServers((prev) => [...prev, s]); setShowJoinServer(false); setInviteCode(''); setActiveServer(s); setActiveTab('servers'); }
+    try {
+      const s = await apiPost(`/discord/servers/join/${inviteCode.trim().toUpperCase()}`);
+      setServers((prev) => [...prev, s]); setShowJoinServer(false); setInviteCode(''); setActiveServer(s); setActiveTab('servers');
+    } catch {}
   };
   const loadRoles = async (serverId: string) => {
-    fetch(`/api/discord/servers/${serverId}/roles`, { headers: { Authorization: `Bearer ${token}` } }).catch(() => {});
+    apiGet(`/discord/servers/${serverId}/roles`).catch(() => {});
   };
   const loadMessages = (channelId: string) => {
     if (!channelId || !token) return;
-    fetch(`/api/discord/channels/${channelId}/messages`, { headers: { Authorization: `Bearer ${token}` } })
-      .then((r) => r.json()).then((d) => { if (Array.isArray(d)) setMessages(d); }).catch(() => {});
+    apiGet(`/discord/channels/${channelId}/messages`)
+      .then((d) => { if (Array.isArray(d)) setMessages(d); }).catch(() => {});
   };
   const createChannel = async () => {
     if (!channelName.trim() || !activeServer || !token) return;
-    const res = await fetch(`/api/discord/servers/${activeServer.id}/channels`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }, body: JSON.stringify({ name: channelName, type: channelType }) });
-    if (res.ok) { const ch = await res.json(); setChannels((prev) => [...prev, ch]); setShowCreateChannel(false); setChannelName(''); }
+    try {
+      const ch = await apiPost(`/discord/servers/${activeServer.id}/channels`, { name: channelName, type: channelType });
+      setChannels((prev) => [...prev, ch]); setShowCreateChannel(false); setChannelName('');
+    } catch {}
   };
   const createCategory = async () => {
     if (!categoryName.trim() || !activeServer || !token) return;
-    const res = await fetch(`/api/discord/servers/${activeServer.id}/categories`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }, body: JSON.stringify({ name: categoryName }) });
-    if (res.ok) { const cat = await res.json(); setChannels((prev) => [...prev, cat]); setShowCreateCategory(false); setCategoryName(''); }
+    try {
+      const cat = await apiPost(`/discord/servers/${activeServer.id}/categories`, { name: categoryName });
+      setChannels((prev) => [...prev, cat]); setShowCreateCategory(false); setCategoryName('');
+    } catch {}
   };
   const deleteMessage = async (msgId: string) => {
     if (!token) return;
-    await fetch(`/api/discord/messages/${msgId}`, { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } });
-    setMessages(prev => prev.filter(m => m.id !== msgId));
+    try {
+      await apiDelete(`/discord/messages/${msgId}`);
+      setMessages(prev => prev.filter(m => m.id !== msgId));
+    } catch {}
   };
   const editMessage = async () => {
     if (!editContent.trim() || !editingMessage || !token) return;
-    await fetch(`/api/discord/messages/${editingMessage}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }, body: JSON.stringify({ content: editContent }) });
-    setMessages(prev => prev.map(m => m.id === editingMessage ? { ...m, content: editContent } : m));
-    setEditingMessage(null); setEditContent('');
+    try {
+      await apiPatch(`/discord/messages/${editingMessage}`, { content: editContent });
+      setMessages(prev => prev.map(m => m.id === editingMessage ? { ...m, content: editContent } : m));
+      setEditingMessage(null); setEditContent('');
+    } catch {}
   };
   const addReaction = async (msgId: string, emoji: string) => {
     if (!token) return;
-    const res = await fetch(`/api/discord/messages/${msgId}/reactions`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }, body: JSON.stringify({ emoji }) });
-    if (res.ok) { const data = await res.json(); setMessageReactions(prev => ({ ...prev, [msgId]: data.reactions })); }
+    try {
+      const data = await apiPost(`/discord/messages/${msgId}/reactions`, { emoji });
+      setMessageReactions(prev => ({ ...prev, [msgId]: data.reactions }));
+    } catch {}
   };
   const loadReactions = async (msgId: string) => {
     if (!token || messageReactions[msgId]) return;
-    const res = await fetch(`/api/discord/messages/${msgId}/reactions`, { headers: { Authorization: `Bearer ${token}` } });
-    if (res.ok) { const data = await res.json(); if (Array.isArray(data)) setMessageReactions(prev => ({ ...prev, [msgId]: data })); }
+    try {
+      const data = await apiGet(`/discord/messages/${msgId}/reactions`);
+      if (Array.isArray(data)) setMessageReactions(prev => ({ ...prev, [msgId]: data }));
+    } catch {}
   };
 
   // Drag & drop channels
@@ -272,38 +289,44 @@ export function TavernPage() {
     updated[idx] = { ...updated[idx], category_id: targetCategoryId || undefined, position: newPosition };
     setChannels(updated);
 
-    await fetch(`/api/discord/channels/${dragChannel.id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ category_id: targetCategoryId || null, position: newPosition }),
-    });
+    try {
+      await apiPatch(`/discord/channels/${dragChannel.id}`, { category_id: targetCategoryId || null, position: newPosition });
+    } catch {}
     setDragChannel(null);
   };
   const updateServer = async () => {
     if (!editingServer || !token) return;
-    await fetch(`/api/discord/servers/${editingServer.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }, body: JSON.stringify({ name: editName }) });
-    setServers((prev) => prev.map((s) => s.id === editingServer.id ? { ...s, name: editName } : s));
-    if (activeServer?.id === editingServer.id) setActiveServer((prev) => prev ? { ...prev, name: editName } : null);
-    setEditingServer(null);
+    try {
+      await apiPatch(`/discord/servers/${editingServer.id}`, { name: editName });
+      setServers((prev) => prev.map((s) => s.id === editingServer.id ? { ...s, name: editName } : s));
+      if (activeServer?.id === editingServer.id) setActiveServer((prev) => prev ? { ...prev, name: editName } : null);
+      setEditingServer(null);
+    } catch {}
   };
   const deleteServer = async (s: Server) => {
     if (!token || !confirm('Удалить сервер навсегда?')) return;
-    await fetch(`/api/discord/servers/${s.id}`, { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } });
-    setServers((prev) => prev.filter((x) => x.id !== s.id));
-    if (activeServer?.id === s.id) setActiveServer(null);
+    try {
+      await apiDelete(`/discord/servers/${s.id}`);
+      setServers((prev) => prev.filter((x) => x.id !== s.id));
+      if (activeServer?.id === s.id) setActiveServer(null);
+    } catch {}
   };
   const updateChannel = async () => {
     if (!editingChannel || !token) return;
-    await fetch(`/api/discord/channels/${editingChannel.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }, body: JSON.stringify({ name: editName }) });
-    setChannels((prev) => prev.map((c) => c.id === editingChannel.id ? { ...c, name: editName } : c));
-    if (activeChannel?.id === editingChannel.id) setActiveChannel((prev) => prev ? { ...prev, name: editName } : null);
-    setEditingChannel(null);
+    try {
+      await apiPatch(`/discord/channels/${editingChannel.id}`, { name: editName });
+      setChannels((prev) => prev.map((c) => c.id === editingChannel.id ? { ...c, name: editName } : c));
+      if (activeChannel?.id === editingChannel.id) setActiveChannel((prev) => prev ? { ...prev, name: editName } : null);
+      setEditingChannel(null);
+    } catch {}
   };
   const deleteChannel = async (ch: Channel) => {
     if (!token || !confirm('Удалить канал?')) return;
-    await fetch(`/api/discord/channels/${ch.id}`, { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } });
-    setChannels((prev) => prev.filter((c) => c.id !== ch.id));
-    if (activeChannel?.id === ch.id) setActiveChannel(null);
+    try {
+      await apiDelete(`/discord/channels/${ch.id}`);
+      setChannels((prev) => prev.filter((c) => c.id !== ch.id));
+      if (activeChannel?.id === ch.id) setActiveChannel(null);
+    } catch {}
   };
 
   const joinVoice = async (channel: Channel) => {
@@ -426,7 +449,7 @@ export function TavernPage() {
   const searchDmUsers = (q: string) => {
     setDmSearchQuery(q);
     if (q.length < 2) { setDmSearchResults([]); return; }
-    fetch(`/api/dm/search/${encodeURIComponent(q)}`, { headers: { Authorization: `Bearer ${token}` } }).then((r) => r.json()).then(setDmSearchResults).catch(() => {});
+    apiGet(`/dm/search/${encodeURIComponent(q)}`).then(setDmSearchResults).catch(() => {});
   };
   const openDm = (conv: DMConv) => { setActiveDm(conv); setActiveTab('dm'); setActiveServer(null); };
   const startDmChat = (u: any) => {
@@ -847,8 +870,10 @@ export function TavernPage() {
                 <button onClick={() => setShowCreateRole(false)} className="btn-secondary text-xs py-2 px-4">Отмена</button>
                 <button onClick={async () => {
                   if (!roleName.trim() || !activeServer) return;
-                  await fetch(`/api/discord/servers/${activeServer.id}/roles`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }, body: JSON.stringify({ name: roleName, color: roleColor }) });
-                  setShowCreateRole(false); setRoleName(''); loadRoles(activeServer.id);
+                  try {
+                    await apiPost(`/discord/servers/${activeServer.id}/roles`, { name: roleName, color: roleColor });
+                    setShowCreateRole(false); setRoleName(''); loadRoles(activeServer.id);
+                  } catch {}
                 }} disabled={!roleName.trim()} className="btn-primary text-xs py-2 px-4">Создать</button>
               </div>
             </motion.div>
@@ -879,8 +904,10 @@ export function TavernPage() {
             onClick={() => setContextMenu(null)}>
             <button onClick={async () => {
               if (!contextMenu) return;
-              await fetch(`/api/discord/messages/${contextMenu.msgId}`, { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } });
-              loadMessages(contextMenu.channelId);
+              try {
+                await apiDelete(`/discord/messages/${contextMenu.msgId}`);
+                loadMessages(contextMenu.channelId);
+              } catch {}
               setContextMenu(null);
             }} className="w-full text-left px-4 py-2 text-xs font-mono text-red-400 hover:bg-red-500/10 transition-colors">
               Удалить сообщение

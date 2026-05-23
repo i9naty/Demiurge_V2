@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useStore } from '../store';
+import { apiGet, apiPost, apiPatch, apiDelete } from '../utils/api';
 import { VTTCanvas } from '../components/vtt/VTTCanvas';
 import { ChatPanel } from '../components/vtt/ChatPanel';
 import { InitiativeTracker, Combatant } from '../components/vtt/InitiativeTracker';
@@ -160,7 +161,6 @@ export function RoomPage() {
   }, [socket, roomId]);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const hdrs = { Authorization: `Bearer ${token || ''}` };
 
   // Combat handlers
   const initHandlers = {
@@ -250,16 +250,16 @@ export function RoomPage() {
   // Load room data
   useEffect(() => {
     if (!roomId) return;
-    fetch(`/api/rooms/${roomId}`, { headers: hdrs }).then(r => r.json()).then(setRoom).catch(() => {});
+    apiGet(`/rooms/${roomId}`).then(setRoom).catch(() => {});
     loadScenes();
-    fetch(`/api/rooms/${roomId}/messages`, { headers: hdrs }).then(r => r.json()).then((d: any) => {
+    apiGet(`/rooms/${roomId}/messages`).then((d: any) => {
       if (Array.isArray(d)) setMessages(d.reverse());
     }).catch(() => {});
   }, [roomId]);
 
   const loadScenes = () => {
     if (!roomId) return;
-    fetch(`/api/rooms/${roomId}/scenes`, { headers: hdrs }).then(r => r.json()).then((data: any) => {
+    apiGet(`/rooms/${roomId}/scenes`).then((data: any) => {
       if (!Array.isArray(data)) return;
       setScenes(data);
       if (!activeScene && data.length > 0) setActiveScene(data[0]);
@@ -270,7 +270,7 @@ export function RoomPage() {
   // Load tokens
   useEffect(() => {
     if (!roomId || !activeScene) return;
-    fetch(`/api/rooms/${roomId}/tokens`, { headers: hdrs }).then(r => r.json()).then((t: any) => {
+    apiGet(`/rooms/${roomId}/tokens`).then((t: any) => {
       if (!Array.isArray(t)) return;
       setTokens(t.map((tok: any) => ({ ...tok, imageUrl: tok.image_url ?? tok.imageUrl ?? null })));
     }).catch(() => {});
@@ -330,20 +330,20 @@ export function RoomPage() {
 
   const uploadMap = (url: string) => {
     if (!activeScene || !roomId) return;
-    fetch(`/api/rooms/${roomId}/scenes/${activeScene.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json', ...hdrs }, body: JSON.stringify({ mapUrl: url }) }).then(loadScenes);
+    apiPatch(`/rooms/${roomId}/scenes/${activeScene.id}`, { mapUrl: url }).then(loadScenes);
   };
 
   const createScene = () => {
     if (!roomId || !newSceneName.trim()) return;
-    fetch(`/api/rooms/${roomId}/scenes`, { method: 'POST', headers: { 'Content-Type': 'application/json', ...hdrs }, body: JSON.stringify({ name: newSceneName }) })
-      .then(r => r.json()).then(s => { setScenes(prev => [...prev, s]); setActiveScene(s); setNewSceneName(''); setShowScenePanel(false); });
+    apiPost(`/rooms/${roomId}/scenes`, { name: newSceneName })
+      .then(s => { setScenes(prev => [...prev, s]); setActiveScene(s); setNewSceneName(''); setShowScenePanel(false); });
   };
 
   const confirmDeleteScene = (id: string) => setDeleteConfirm(id);
   const doDeleteScene = () => {
     if (!roomId || !deleteConfirm) return;
     const id = deleteConfirm; setDeleteConfirm(null);
-    fetch(`/api/rooms/${roomId}/scenes/${id}`, { method: 'DELETE', headers: hdrs }).then(() => {
+    apiDelete(`/rooms/${roomId}/scenes/${id}`).then(() => {
       setScenes(prev => prev.filter(s => s.id !== id));
       if (activeScene?.id === id) setActiveScene(scenes.find(s => s.id !== id) || null);
     });
@@ -351,7 +351,7 @@ export function RoomPage() {
 
   const updateSceneGrid = (upd: Record<string, any>) => {
     if (!activeScene || !roomId) return;
-    fetch(`/api/rooms/${roomId}/scenes/${activeScene.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json', ...hdrs }, body: JSON.stringify(upd) }).then(() => loadScenes());
+    apiPatch(`/rooms/${roomId}/scenes/${activeScene.id}`, upd).then(() => loadScenes());
   };
 
   const switchGridType = () => { const types = ['square', 'hex', 'iso']; const idx = types.indexOf(activeScene?.grid_type as any); updateSceneGrid({ gridType: types[(idx + 1) % 3] }); };

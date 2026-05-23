@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useStore } from '../store';
+import { apiGet, apiPost } from '../utils/api';
 import { Hash, Volume2, Plus, X, User, Users, Settings, HashIcon, Mic, MicOff, Headphones, Phone, PhoneOff, Send, Copy, ChevronDown } from 'lucide-react';
 
 interface Server { id: string; name: string; icon_url: string | null; owner_id: string; invite_code: string; member_count: number; }
@@ -29,23 +30,19 @@ export function DiscordPage() {
 
   useEffect(() => {
     if (!token) return;
-    fetch('/api/discord/servers', { headers: { Authorization: `Bearer ${token}` } })
-      .then((r) => r.json()).then(setServers).catch(() => {});
+    apiGet('/discord/servers').then(setServers).catch(() => {});
   }, [token]);
 
   useEffect(() => {
     if (!activeServer || !token) return;
-    fetch(`/api/discord/servers/${activeServer.id}/channels`, { headers: { Authorization: `Bearer ${token}` } })
-      .then((r) => r.json()).then(setChannels).catch(() => {});
-    fetch(`/api/discord/servers/${activeServer.id}/members`, { headers: { Authorization: `Bearer ${token}` } })
-      .then((r) => r.json()).then(setMembers).catch(() => {});
+    apiGet(`/discord/servers/${activeServer.id}/channels`).then(setChannels).catch(() => {});
+    apiGet(`/discord/servers/${activeServer.id}/members`).then(setMembers).catch(() => {});
     joinServerSocket(activeServer.id);
   }, [activeServer?.id, token]);
 
   useEffect(() => {
     if (!activeChannel || activeChannel.type !== 'text' || !token) return;
-    fetch(`/api/discord/channels/${activeChannel.id}/messages`, { headers: { Authorization: `Bearer ${token}` } })
-      .then((r) => r.json()).then(setMessages).catch(() => {});
+    apiGet(`/discord/channels/${activeChannel.id}/messages`).then(setMessages).catch(() => {});
     if (socket) {
       socket.emit('discord:join_channel', { serverId: activeServer?.id, channelId: activeChannel.id });
     }
@@ -65,18 +62,24 @@ export function DiscordPage() {
   };
   const createServer = async () => {
     if (!serverName.trim() || !token) return;
-    const res = await fetch('/api/discord/servers', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }, body: JSON.stringify({ name: serverName }) });
-    if (res.ok) { const s = await res.json(); setServers((prev) => [...prev, s]); setShowCreateServer(false); setServerName(''); setActiveServer(s); }
+    try {
+      const s = await apiPost('/discord/servers', { name: serverName });
+      setServers((prev) => [...prev, s]); setShowCreateServer(false); setServerName(''); setActiveServer(s);
+    } catch {}
   };
   const joinServer = async () => {
     if (!inviteCode.trim() || !token) return;
-    const res = await fetch(`/api/discord/servers/join/${inviteCode.trim().toUpperCase()}`, { method: 'POST', headers: { Authorization: `Bearer ${token}` } });
-    if (res.ok) { const s = await res.json(); setServers((prev) => [...prev, s]); setShowJoinServer(false); setInviteCode(''); setActiveServer(s); }
+    try {
+      const s = await apiPost(`/discord/servers/join/${inviteCode.trim().toUpperCase()}`);
+      setServers((prev) => [...prev, s]); setShowJoinServer(false); setInviteCode(''); setActiveServer(s);
+    } catch {}
   };
   const createChannel = async () => {
     if (!channelName.trim() || !activeServer || !token) return;
-    const res = await fetch(`/api/discord/servers/${activeServer.id}/channels`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }, body: JSON.stringify({ name: channelName, type: channelType }) });
-    if (res.ok) { const ch = await res.json(); setChannels((prev) => [...prev, ch]); setShowCreateChannel(false); setChannelName(''); }
+    try {
+      const ch = await apiPost(`/discord/servers/${activeServer.id}/channels`, { name: channelName, type: channelType });
+      setChannels((prev) => [...prev, ch]); setShowCreateChannel(false); setChannelName('');
+    } catch {}
   };
   const sendMessage = () => {
     if (!input.trim() || !activeChannel || !socket) return;

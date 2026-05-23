@@ -1,7 +1,6 @@
 import { create } from 'zustand';
 import { io, Socket } from 'socket.io-client';
-
-const API = '/api';
+import { apiPost } from '../utils/api';
 
 interface User {
   id: string;
@@ -13,20 +12,6 @@ interface User {
   role: string;
   subscriptionTier?: string;
   isGuest?: boolean;
-}
-
-async function apiPost(path: string, body?: unknown) {
-  const res = await fetch(`${API}${path}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: body ? JSON.stringify(body) : undefined,
-  });
-  const json = await res.json();
-  if (!res.ok || !json.success) {
-    const msg = json.error?.message || 'Ошибка запроса';
-    throw new Error(msg);
-  }
-  return json.data;
 }
 
 interface AuthState {
@@ -52,7 +37,7 @@ export const useStore = create<AuthState>((set, get) => ({
   login: async (username, password) => {
     set({ isLoading: true });
     try {
-      const data = await apiPost('/auth/login', { username, password });
+      const data = await apiPost('/auth/login', { email: username, password });
       localStorage.setItem('demiurge_token', data.token);
       localStorage.setItem('demiurge_refresh', data.refreshToken);
       set({ user: data.user, token: data.token, isLoading: false });

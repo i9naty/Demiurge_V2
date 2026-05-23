@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { useStore } from '../store';
+import { apiGet, apiPost } from '../utils/api';
 import { Heart, MessageCircle, Send, Clock, User, Globe, Dices, Flame, ScrollText, Sparkles, ImageIcon, X } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 
@@ -60,13 +61,13 @@ export function SocialPage() {
   }, []);
 
   const fetchPosts = (type: string) => {
-    const url = type === 'popular' ? '/api/social/posts/popular' : '/api/social/posts';
-    fetch(url).then((r) => r.json()).then((d) => { if (Array.isArray(d)) setPosts(d); }).catch(() => {});
+    const path = type === 'popular' ? '/social/posts/popular' : '/social/posts';
+    apiGet(path).then((d) => { if (Array.isArray(d)) setPosts(d); }).catch(() => {});
   };
 
   const fetchActiveRooms = () => {
-    fetch('/api/rooms?mode=world').then((r) => r.json()).then((d) => { if (Array.isArray(d)) setActiveRooms(d); }).catch(() => {});
-    fetch('/api/rooms').then((r) => r.json()).then(() => {
+    apiGet('/rooms?mode=world').then((d) => { if (Array.isArray(d)) setActiveRooms(d); }).catch(() => {});
+    apiGet('/rooms').then(() => {
       setPosts([]);
     }).catch(() => {});
   };
@@ -74,30 +75,18 @@ export function SocialPage() {
   const createPost = async () => {
     if (!newPost.trim() || !token) return;
     try {
-      const res = await fetch('/api/social/posts', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ content: newPost, imageUrl: postImage }),
-      });
-      if (res.ok) {
-        const post = await res.json();
-        setPosts((prev) => [{ ...post, likes_count: 0, comments_count: 0 }, ...prev]);
-        setNewPost('');
-        setPostImage(null);
-      }
+      const post = await apiPost('/social/posts', { content: newPost, imageUrl: postImage });
+      setPosts((prev) => [{ ...post, likes_count: 0, comments_count: 0 }, ...prev]);
+      setNewPost('');
+      setPostImage(null);
     } catch {}
   };
 
   const toggleLike = async (postId: string) => {
     if (!token) return;
     try {
-      const res = await fetch(`/api/social/posts/${postId}/like`, {
-        method: 'POST', headers: { Authorization: `Bearer ${token}` },
-      });
-      if (res.ok) {
-        const { likesCount } = await res.json();
-        setPosts((prev) => prev.map((p) => (p.id === postId ? { ...p, likes_count: likesCount } : p)));
-      }
+      const { likesCount } = await apiPost(`/social/posts/${postId}/like`);
+      setPosts((prev) => prev.map((p) => (p.id === postId ? { ...p, likes_count: likesCount } : p)));
     } catch {}
   };
 
@@ -105,8 +94,7 @@ export function SocialPage() {
     if (expandedComments === postId) { setExpandedComments(null); return; }
     setExpandedComments(postId);
     try {
-      const res = await fetch(`/api/social/posts/${postId}/comments`);
-      const data = await res.json();
+      const data = await apiGet(`/social/posts/${postId}/comments`);
       if (Array.isArray(data)) setComments((prev) => ({ ...prev, [postId]: data }));
     } catch {}
   };
@@ -114,17 +102,10 @@ export function SocialPage() {
   const addComment = async (postId: string) => {
     if (!commentInput.trim() || !token) return;
     try {
-      const res = await fetch(`/api/social/posts/${postId}/comments`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ content: commentInput }),
-      });
-      if (res.ok) {
-        const comment = await res.json();
-        setComments((prev) => ({ ...prev, [postId]: [...(prev[postId] || []), comment] }));
-        setPosts((prev) => prev.map((p) => (p.id === postId ? { ...p, comments_count: p.comments_count + 1 } : p)));
-        setCommentInput('');
-      }
+      const comment = await apiPost(`/social/posts/${postId}/comments`, { content: commentInput });
+      setComments((prev) => ({ ...prev, [postId]: [...(prev[postId] || []), comment] }));
+      setPosts((prev) => prev.map((p) => (p.id === postId ? { ...p, comments_count: p.comments_count + 1 } : p)));
+      setCommentInput('');
     } catch {}
   };
 

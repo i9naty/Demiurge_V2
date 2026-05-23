@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { useStore } from '../store';
+import { apiPost } from '../utils/api';
 import { Crown, Sparkles, Check, Shield, Zap } from 'lucide-react';
 
 export function PaymentsPage() {
@@ -55,22 +56,15 @@ export function PaymentsPage() {
     try {
       const t = useStore.getState().token;
       if (!t) { setMessage('⚠️ Войдите в аккаунт'); setLoadingTier(null); return; }
-      const res = await fetch('/api/payments/subscribe', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${t}` },
-        body: JSON.stringify({ tier }),
-      });
-      const data = await res.json();
+      const data = await apiPost('/payments/subscribe', { tier });
       if (data.paymentUrl) {
 
         window.location.href = data.paymentUrl;
         setMessage('Перенаправляем на страницу оплаты...');
-      } else if (data.success) {
+      } else {
         setMessage(`✅ Тариф ${tier.toUpperCase()} активирован`);
         const cu = useStore.getState().user;
         if (cu) useStore.setState({ user: { ...cu, subscriptionTier: tier } });
-      } else {
-        setMessage(`❌ ${data.error || 'Ошибка оплаты'}`);
       }
     } catch {
       setMessage('❌ Ошибка соединения');

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useStore } from '../store';
+import { apiGet, apiPost } from '../utils/api';
 import { IsometricMap } from '../components/world/IsometricMap';
 import { ArrowLeft, Heart, Package, Hammer, ScrollText, TrendingUp, Sparkles, Globe, TreePine, Mountain, CloudSnow, Droplets, Map } from 'lucide-react';
 
@@ -39,18 +40,17 @@ export function WorldPage() {
   const [seed, setSeed] = useState(Math.floor(Math.random() * 2147483647));
   const [biome, setBiome] = useState('mixed');
   const [density, setDensity] = useState(1.0);
-  const hdrs = { Authorization: `Bearer ${localStorage.getItem('demiurge_token')||''}` };
 
   useEffect(() => {
     if (!roomId) return;
-    fetch(`/api/world/${roomId}`,{headers:hdrs}).then(r=>r.json()).then(ws=>{
+    apiGet(`/world/${roomId}`).then(ws=>{
       setWorldState(ws);
       if (ws.seed) setSeed(ws.seed);
     }).catch(()=>{});
-    fetch(`/api/world/${roomId}/buildings`,{headers:hdrs}).then(r=>r.json()).then(d=>{if(Array.isArray(d))setBuildings(d)}).catch(()=>{});
-    fetch(`/api/world/${roomId}/npcs`,{headers:hdrs}).then(r=>r.json()).then(d=>{if(Array.isArray(d))setNpcs(d)}).catch(()=>{});
-    fetch(`/api/world/${roomId}/inventory`,{headers:hdrs}).then(r=>r.json()).then(d=>{if(Array.isArray(d))setInventory(d)}).catch(()=>{});
-    fetch(`/api/world/${roomId}/quests`,{headers:hdrs}).then(r=>r.json()).then(d=>{if(Array.isArray(d))setQuests(d)}).catch(()=>{});
+    apiGet(`/world/${roomId}/buildings`).then(d=>{if(Array.isArray(d))setBuildings(d)}).catch(()=>{});
+    apiGet(`/world/${roomId}/npcs`).then(d=>{if(Array.isArray(d))setNpcs(d)}).catch(()=>{});
+    apiGet(`/world/${roomId}/inventory`).then(d=>{if(Array.isArray(d))setInventory(d)}).catch(()=>{});
+    apiGet(`/world/${roomId}/quests`).then(d=>{if(Array.isArray(d))setQuests(d)}).catch(()=>{});
   }, [roomId]);
 
   useEffect(() => {
@@ -68,9 +68,7 @@ export function WorldPage() {
   const build = async () => {
     if(!roomId)return;
     try {
-      const r=await fetch(`/api/world/${roomId}/buildings`,{method:'POST',headers:{'Content-Type':'application/json',...hdrs},body:JSON.stringify({tileX:playerPos.x,tileY:playerPos.y,buildingType:selBuilding,name:selBuilding})});
-      if(!r.ok)return;
-      const b=await r.json();
+      const b=await apiPost(`/world/${roomId}/buildings`,{tileX:playerPos.x,tileY:playerPos.y,buildingType:selBuilding,name:selBuilding});
       if(b && b.id) { setBuildings(p=>[...p,b]); setBuildingMode(false); }
     } catch {}
   };

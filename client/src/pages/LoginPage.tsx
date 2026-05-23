@@ -7,7 +7,7 @@ import { Sparkles, LogIn } from 'lucide-react';
 export function LoginPage() {
   const { login, isLoading } = useStore();
   const navigate = useNavigate();
-  const [username, setUsername] = useState('');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
 
@@ -15,7 +15,7 @@ export function LoginPage() {
     e.preventDefault();
     setError('');
     try {
-      await login(username, password);
+      await login(email, password);
       navigate('/');
     } catch (err: any) {
       setError(err.message);
@@ -48,11 +48,11 @@ export function LoginPage() {
           <div>
             <label className="block text-xs font-mono text-demiurge-muted mb-1.5">Имя или Email</label>
             <input
-              type="text"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
               className="input-field"
-              placeholder="master_dungeon"
+              placeholder="master@dungeon.com"
               required
             />
           </div>

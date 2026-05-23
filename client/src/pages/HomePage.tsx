@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useStore } from '../store';
+import { apiGet } from '../utils/api';
 import { ToastContainer } from '../components/ui/Toast';
 import { CommandPalette, useCommandPalette } from '../components/ui/CommandPalette';
 import {
@@ -40,8 +41,7 @@ export function HomePage() {
 
   useEffect(() => {
     setLoadingGames(true);
-    fetch('/api/game/public')
-      .then(r => r.json())
+    apiGet('/game/public')
       .then((data: PublicGame[]) => setPublicGames(Array.isArray(data) ? data : []))
       .catch(() => {})
       .finally(() => setLoadingGames(false));
