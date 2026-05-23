@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import { v4 as uuid } from 'uuid';
 import { query } from '../config/database';
 import { authMiddleware, optionalAuth } from '../middleware/auth';
+import { ok, fail } from '../middleware/response';
 
 export const socialRouter = Router();
 
@@ -10,10 +11,10 @@ socialRouter.post('/posts', authMiddleware, async (req: Request, res: Response) 
   try {
     const { content, imageUrl, roomId } = req.body;
     if (!content || content.trim().length === 0) {
-      res.status(400).json({ error: 'Контент поста обязателен' }); return;
+      fail(res, 'INVALID_INPUT', 'Контент поста обязателен', 400); return;
     }
     if (content.length > 10000) {
-      res.status(400).json({ error: 'Пост слишком длинный' }); return;
+      fail(res, 'INVALID_INPUT', 'Пост слишком длинный', 400); return;
     }
 
     const postId = uuid();
@@ -33,10 +34,10 @@ socialRouter.post('/posts', authMiddleware, async (req: Request, res: Response) 
       [postId]
     );
 
-    res.status(201).json(result.rows[0]);
+    ok(res, result.rows[0], 201);
   } catch (err: any) {
     console.error('Social create post:', err.message);
-    res.status(500).json({ error: 'Ошибка создания поста' });
+    fail(res, 'SERVER_ERROR', 'Ошибка создания поста', 500);
   }
 });
 
@@ -57,10 +58,10 @@ socialRouter.get('/posts', optionalAuth, async (req: Request, res: Response) => 
       [limit, offset]
     );
 
-    res.json(result.rows);
+    ok(res, result.rows);
   } catch (err: any) {
     console.error('Social feed:', err.message);
-    res.status(500).json({ error: 'Ошибка получения ленты' });
+    fail(res, 'SERVER_ERROR', 'Ошибка получения ленты', 500);
   }
 });
 
@@ -78,10 +79,10 @@ socialRouter.get('/posts/popular', optionalAuth, async (req: Request, res: Respo
        ORDER BY likes_count DESC, p.created_at DESC LIMIT $1`,
       [limit]
     );
-    res.json(result.rows);
+    ok(res, result.rows);
   } catch (err: any) {
     console.error('Social popular:', err.message);
-    res.status(500).json({ error: 'Ошибка получения популярного' });
+    fail(res, 'SERVER_ERROR', 'Ошибка получения популярного', 500);
   }
 });
 
@@ -93,10 +94,10 @@ socialRouter.post('/posts/:postId/like', authMiddleware, async (req: Request, re
       [(req.params.postId as string), req.user!.userId]
     );
     const count = await query('SELECT COUNT(*) FROM post_likes WHERE post_id = $1', [(req.params.postId as string)]);
-    res.json({ likesCount: parseInt(count.rows[0].count) });
+    ok(res, { likesCount: parseInt(count.rows[0].count) });
   } catch (err: any) {
     console.error('Social like:', err.message);
-    res.status(500).json({ error: 'Ошибка лайка' });
+    fail(res, 'SERVER_ERROR', 'Ошибка лайка', 500);
   }
 });
 
@@ -108,10 +109,10 @@ socialRouter.delete('/posts/:postId/like', authMiddleware, async (req: Request, 
       [(req.params.postId as string), req.user!.userId]
     );
     const count = await query('SELECT COUNT(*) FROM post_likes WHERE post_id = $1', [(req.params.postId as string)]);
-    res.json({ likesCount: parseInt(count.rows[0].count) });
+    ok(res, { likesCount: parseInt(count.rows[0].count) });
   } catch (err: any) {
     console.error('Social unlike:', err.message);
-    res.status(500).json({ error: 'Ошибка удаления лайка' });
+    fail(res, 'SERVER_ERROR', 'Ошибка удаления лайка', 500);
   }
 });
 
@@ -124,10 +125,10 @@ socialRouter.get('/posts/:postId/comments', optionalAuth, async (req: Request, r
        WHERE pc.post_id = $1 ORDER BY pc.created_at ASC`,
       [(req.params.postId as string)]
     );
-    res.json(result.rows);
+    ok(res, result.rows);
   } catch (err: any) {
     console.error('Social comments:', err.message);
-    res.status(500).json({ error: 'Ошибка получения комментариев' });
+    fail(res, 'SERVER_ERROR', 'Ошибка получения комментариев', 500);
   }
 });
 
@@ -136,10 +137,10 @@ socialRouter.post('/posts/:postId/comments', authMiddleware, async (req: Request
   try {
     const { content } = req.body;
     if (!content || content.trim().length === 0) {
-      res.status(400).json({ error: 'Комментарий не может быть пустым' }); return;
+      fail(res, 'INVALID_INPUT', 'Комментарий не может быть пустым', 400); return;
     }
     if (content.length > 5000) {
-      res.status(400).json({ error: 'Комментарий слишком длинный' }); return;
+      fail(res, 'INVALID_INPUT', 'Комментарий слишком длинный', 400); return;
     }
 
     const id = uuid();
@@ -154,10 +155,10 @@ socialRouter.post('/posts/:postId/comments', authMiddleware, async (req: Request
       [id]
     );
 
-    res.status(201).json(result.rows[0]);
+    ok(res, result.rows[0], 201);
   } catch (err: any) {
     console.error('Social comment:', err.message);
-    res.status(500).json({ error: 'Ошибка создания комментария' });
+    fail(res, 'SERVER_ERROR', 'Ошибка создания комментария', 500);
   }
 });
 
@@ -175,7 +176,7 @@ socialRouter.get('/profile/:username', optionalAuth, async (req: Request, res: R
     );
 
     if (result.rows.length === 0) {
-      res.status(404).json({ error: 'Пользователь не найден' }); return;
+      fail(res, 'NOT_FOUND', 'Пользователь не найден', 404); return;
     }
 
     const profile = result.rows[0];
@@ -191,9 +192,9 @@ socialRouter.get('/profile/:username', optionalAuth, async (req: Request, res: R
       [profile.id]
     );
 
-    res.json({ profile, posts: posts.rows });
+    ok(res, { profile, posts: posts.rows });
   } catch (err: any) {
     console.error('Social profile:', err.message);
-    res.status(500).json({ error: 'Ошибка получения профиля' });
+    fail(res, 'SERVER_ERROR', 'Ошибка получения профиля', 500);
   }
 });

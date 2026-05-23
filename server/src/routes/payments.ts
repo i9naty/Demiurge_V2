@@ -1,13 +1,14 @@
 import { Router, Request, Response } from 'express';
 import { query } from '../config/database';
 import { authMiddleware } from '../middleware/auth';
+import { ok, fail } from '../middleware/response';
 import { env } from '../config/env';
 
 export const paymentsRouter = Router();
 
 // Получить доступные подписки
 paymentsRouter.get('/plans', (_req: Request, res: Response) => {
-  res.json([
+  ok(res, [
     {
       id: 'free',
       name: 'Свободный',
@@ -41,7 +42,7 @@ paymentsRouter.post('/subscribe', authMiddleware, async (req: Request, res: Resp
     const { tier } = req.body;
 
     if (!tier || !['plus', 'premium', 'legend'].includes(tier)) {
-      res.status(400).json({ error: 'Неверный тариф' });
+      fail(res, 'INVALID_INPUT', 'Неверный тариф', 400);
       return;
     }
 
@@ -74,18 +75,18 @@ paymentsRouter.post('/subscribe', authMiddleware, async (req: Request, res: Resp
       if (!response.ok) {
         const errText = await response.text();
         console.error('YooKassa API error:', response.status, errText);
-        res.status(502).json({ error: 'Ошибка платёжного шлюза' });
+        fail(res, 'SERVER_ERROR', 'Ошибка платёжного шлюза', 502);
         return;
       }
 
       const payment: any = await response.json();
 
       if (!payment.confirmation?.confirmation_url) {
-        res.status(502).json({ error: 'Не удалось получить ссылку на оплату' });
+        fail(res, 'SERVER_ERROR', 'Не удалось получить ссылку на оплату', 502);
         return;
       }
 
-      res.json({ paymentUrl: payment.confirmation.confirmation_url, paymentId: payment.id });
+      ok(res, { paymentUrl: payment.confirmation.confirmation_url, paymentId: payment.id });
     } else {
       // Демо-режим — сразу активируем подписку
       const expiresAt = new Date();
@@ -102,11 +103,11 @@ paymentsRouter.post('/subscribe', authMiddleware, async (req: Request, res: Resp
         [tier, expiresAt, req.user!.userId]
       );
 
-      res.json({ success: true, tier, message: 'Подписка активирована (демо-режим)' });
+      ok(res, { tier, message: 'Подписка активирована (демо-режим)' });
     }
   } catch (err: any) {
     console.error('Payment error:', err.message);
-    res.status(500).json({ error: 'Ошибка создания платежа' });
+    fail(res, 'SERVER_ERROR', 'Ошибка создания платежа', 500);
   }
 });
 
@@ -114,10 +115,10 @@ paymentsRouter.post('/subscribe', authMiddleware, async (req: Request, res: Resp
 paymentsRouter.get('/skins', async (_req: Request, res: Response) => {
   try {
     const result = await query('SELECT * FROM skins ORDER BY rarity, price');
-    res.json(result.rows);
+    ok(res, result.rows);
   } catch {
     // Стартовые скины
-    res.json([
+    ok(res, [
       { id: 'skin-neon', name: 'Неоновый', type: 'ui_theme', price: 99, rarity: 'common' },
       { id: 'skin-shadow', name: 'Теневой', type: 'ui_theme', price: 199, rarity: 'rare' },
       { id: 'skin-dragon', name: 'Драконий', type: 'character', price: 499, rarity: 'epic' },
@@ -131,7 +132,7 @@ paymentsRouter.post('/skins/:skinId/buy', authMiddleware, async (req: Request, r
   try {
     const skin = await query('SELECT * FROM skins WHERE id = $1', [req.params.skinId]);
     if (skin.rows.length === 0) {
-      res.status(404).json({ error: 'Скин не найден' });
+      fail(res, 'NOT_FOUND', 'Скин не найден', 404);
       return;
     }
 
@@ -140,8 +141,8 @@ paymentsRouter.post('/skins/:skinId/buy', authMiddleware, async (req: Request, r
       [req.user!.userId, req.params.skinId]
     );
 
-    res.json({ success: true });
+    ok(res, {});
   } catch (err: any) {
-    res.status(500).json({ error: 'Ошибка покупки скина' });
+    fail(res, 'SERVER_ERROR', 'Ошибка покупки скина', 500);
   }
 });

@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { query } from '../config/database';
 import { authMiddleware } from '../middleware/auth';
+import { ok, fail } from '../middleware/response';
 import { generateWorld } from '../services/ai';
 
 export const worldRouter = Router();
@@ -20,11 +21,11 @@ function chunkArray<T>(arr: T[], size: number): T[][] {
 worldRouter.post('/:roomId/generate', authMiddleware, async (req: Request, res: Response) => {
   try {
     if (!await requireParticipant(req.user!.userId, (req.params.roomId as string))) {
-      res.status(403).json({ error: 'Вы не участник этой комнаты' }); return;
+      fail(res, 'FORBIDDEN', 'Вы не участник этой комнаты', 403); return;
     }
     const { width = 50, height = 50, biome = 'mixed', density = 'medium', difficulty = 'normal', prompt = '' } = req.body;
     const ws = await query('SELECT * FROM world_states WHERE room_id = $1', [(req.params.roomId as string)]);
-    if (ws.rows.length === 0) { res.status(404).json({ error: 'Мир не найден' }); return; }
+    if (ws.rows.length === 0) { fail(res, 'NOT_FOUND', 'Мир не найден', 404); return; }
     const seed = ws.rows[0].seed;
     const w = Math.min(width, 80), h = Math.min(height, 80);
     const worldData = await generateWorld({ seed, width: w, height: h, biome, density, difficulty, prompt });
@@ -121,10 +122,10 @@ worldRouter.post('/:roomId/generate', authMiddleware, async (req: Request, res: 
     }
 
     await query('UPDATE world_states SET width=$1, height=$2 WHERE room_id=$3', [w, h, roomId]);
-    res.json({ success: true, stats: { tiles: worldData.tiles?.length || 0, buildings: worldData.buildings?.length || 0, npcs: worldData.npcs?.length || 0, factions: worldData.factions?.length || 0, quests: worldData.quests?.length || 0 } });
+    ok(res, { stats: { tiles: worldData.tiles?.length || 0, buildings: worldData.buildings?.length || 0, npcs: worldData.npcs?.length || 0, factions: worldData.factions?.length || 0, quests: worldData.quests?.length || 0 } });
   } catch (err: any) {
     console.error('World generation error:', err.message);
-    res.status(500).json({ success: false, error: { code: 'GENERATION_ERROR', message: 'Ошибка генерации мира' } });
+    fail(res, 'SERVER_ERROR', 'Ошибка генерации мира', 500);
   }
 });
 
@@ -132,7 +133,7 @@ worldRouter.post('/:roomId/generate', authMiddleware, async (req: Request, res: 
 worldRouter.get('/:roomId', authMiddleware, async (req: Request, res: Response) => {
   try {
     if (!await requireParticipant(req.user!.userId, (req.params.roomId as string))) {
-      res.status(403).json({ error: 'Вы не участник этой комнаты' }); return;
+      fail(res, 'FORBIDDEN', 'Вы не участник этой комнаты', 403); return;
     }
     const result = await query(
       'SELECT * FROM world_states WHERE room_id = $1',
@@ -140,14 +141,14 @@ worldRouter.get('/:roomId', authMiddleware, async (req: Request, res: Response) 
     );
 
     if (result.rows.length === 0) {
-      res.status(404).json({ error: 'Мир не найден' });
+      fail(res, 'NOT_FOUND', 'Мир не найден', 404);
       return;
     }
 
-    res.json(result.rows[0]);
+    ok(res, result.rows[0]);
   } catch (err: any) {
     console.error('World state error:', err.message);
-    res.status(500).json({ error: 'Ошибка получения мира' });
+    fail(res, 'SERVER_ERROR', 'Ошибка получения мира', 500);
   }
 });
 
@@ -166,9 +167,9 @@ worldRouter.get('/:roomId/tiles', authMiddleware, async (req: Request, res: Resp
     sql += ' ORDER BY y, x';
 
     const result = await query(sql, params);
-    res.json(result.rows);
+    ok(res, result.rows);
   } catch (err: any) {
-    res.status(500).json({ error: 'Ошибка получения тайлов' });
+    fail(res, 'SERVER_ERROR', 'Ошибка получения тайлов', 500);
   }
 });
 
@@ -176,7 +177,7 @@ worldRouter.get('/:roomId/tiles', authMiddleware, async (req: Request, res: Resp
 worldRouter.patch('/:roomId/tiles/:x/:y', authMiddleware, async (req: Request, res: Response) => {
   try {
     if (!await requireParticipant(req.user!.userId, (req.params.roomId as string))) {
-      res.status(403).json({ error: 'Нет доступа' }); return;
+      fail(res, 'FORBIDDEN', 'Нет доступа', 403); return;
     }
     const { terrain, resourceAmount } = req.body;
     const { roomId } = req.params;
@@ -191,9 +192,9 @@ worldRouter.patch('/:roomId/tiles/:x/:y', authMiddleware, async (req: Request, r
       [terrain, resourceAmount, req.user!.userId, roomId, parseInt((req.params.x as string) as string), parseInt((req.params.y as string) as string)]
     );
 
-    res.json({ success: true });
+    ok(res, {});
   } catch (err: any) {
-    res.status(500).json({ error: 'Ошибка изменения тайла' });
+    fail(res, 'SERVER_ERROR', 'Ошибка изменения тайла', 500);
   }
 });
 
@@ -204,9 +205,9 @@ worldRouter.get('/:roomId/npcs', authMiddleware, async (req: Request, res: Respo
       'SELECT * FROM npcs WHERE room_id = $1 AND is_alive = true ORDER BY is_unique DESC',
       [(req.params.roomId as string)]
     );
-    res.json(result.rows);
+    ok(res, result.rows);
   } catch (err: any) {
-    res.status(500).json({ error: 'Ошибка получения NPC' });
+    fail(res, 'SERVER_ERROR', 'Ошибка получения NPC', 500);
   }
 });
 
@@ -217,9 +218,9 @@ worldRouter.get('/:roomId/buildings', authMiddleware, async (req: Request, res: 
       'SELECT * FROM buildings WHERE room_id = $1 ORDER BY built_at DESC',
       [(req.params.roomId as string)]
     );
-    res.json(result.rows);
+    ok(res, result.rows);
   } catch (err: any) {
-    res.status(500).json({ error: 'Ошибка получения зданий' });
+    fail(res, 'SERVER_ERROR', 'Ошибка получения зданий', 500);
   }
 });
 
@@ -227,7 +228,7 @@ worldRouter.get('/:roomId/buildings', authMiddleware, async (req: Request, res: 
 worldRouter.post('/:roomId/buildings', authMiddleware, async (req: Request, res: Response) => {
   try {
     if (!await requireParticipant(req.user!.userId, (req.params.roomId as string))) {
-      res.status(403).json({ error: 'Нет доступа' }); return;
+      fail(res, 'FORBIDDEN', 'Нет доступа', 403); return;
     }
     const { tileX, tileY, buildingType, name } = req.body;
 
@@ -240,14 +241,14 @@ worldRouter.post('/:roomId/buildings', authMiddleware, async (req: Request, res:
     );
 
     if (result.rows.length === 0) {
-      res.status(409).json({ error: 'На этом тайле уже есть постройка' });
+      fail(res, 'CONFLICT', 'На этом тайле уже есть постройка', 409);
       return;
     }
 
-    res.status(201).json(result.rows[0]);
+    ok(res, result.rows[0], 201);
   } catch (err: any) {
     console.error('Build error:', err.message);
-    res.status(500).json({ error: 'Ошибка строительства' });
+    fail(res, 'SERVER_ERROR', 'Ошибка строительства', 500);
   }
 });
 
@@ -258,9 +259,9 @@ worldRouter.get('/:roomId/inventory', authMiddleware, async (req: Request, res: 
       'SELECT * FROM player_inventory WHERE user_id = $1 AND room_id = $2 ORDER BY slot',
       [req.user!.userId, (req.params.roomId as string)]
     );
-    res.json(result.rows);
+    ok(res, result.rows);
   } catch (err: any) {
-    res.status(500).json({ error: 'Ошибка получения инвентаря' });
+    fail(res, 'SERVER_ERROR', 'Ошибка получения инвентаря', 500);
   }
 });
 
@@ -274,9 +275,9 @@ worldRouter.get('/:roomId/quests', authMiddleware, async (req: Request, res: Res
        ORDER BY created_at DESC`,
       [(req.params.roomId as string), req.user!.userId]
     );
-    res.json(result.rows);
+    ok(res, result.rows);
   } catch (err: any) {
-    res.status(500).json({ error: 'Ошибка получения квестов' });
+    fail(res, 'SERVER_ERROR', 'Ошибка получения квестов', 500);
   }
 });
 
@@ -291,9 +292,9 @@ worldRouter.get('/:roomId/trades', authMiddleware, async (req: Request, res: Res
        ORDER BY t.created_at DESC`,
       [(req.params.roomId as string)]
     );
-    res.json(result.rows);
+    ok(res, result.rows);
   } catch (err: any) {
-    res.status(500).json({ error: 'Ошибка получения предложений' });
+    fail(res, 'SERVER_ERROR', 'Ошибка получения предложений', 500);
   }
 });
 
@@ -304,8 +305,8 @@ worldRouter.get('/:roomId/factions', authMiddleware, async (req: Request, res: R
       'SELECT * FROM factions WHERE room_id = $1',
       [(req.params.roomId as string)]
     );
-    res.json(result.rows);
+    ok(res, result.rows);
   } catch (err: any) {
-    res.status(500).json({ error: 'Ошибка получения фракций' });
+    fail(res, 'SERVER_ERROR', 'Ошибка получения фракций', 500);
   }
 });

@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import { v4 as uuid } from 'uuid';
 import { query } from '../config/database';
 import { authMiddleware, optionalAuth } from '../middleware/auth';
+import { ok, fail } from '../middleware/response';
 
 export const roomsRouter = Router();
 
@@ -9,9 +10,9 @@ export const roomsRouter = Router();
 roomsRouter.post('/', authMiddleware, async (req: Request, res: Response) => {
   try {
     const { name, description, mode = 'vtt', isPublic = false, maxPlayers = 8, gameType = 'D&D 5e', password: _password, expiresIn } = req.body;
-    if (!name?.trim()) { res.status(400).json({ error: 'Название обязательно' }); return; }
-    if (!['vtt', 'world'].includes(mode)) { res.status(400).json({ error: 'vtt или world' }); return; }
-    if (maxPlayers < 1 || maxPlayers > 50) { res.status(400).json({ error: 'Игроки: 1-50' }); return; }
+    if (!name?.trim()) { fail(res, 'INVALID_INPUT', 'Название обязательно', 400); return; }
+    if (!['vtt', 'world'].includes(mode)) { fail(res, 'INVALID_INPUT', 'vtt или world', 400); return; }
+    if (maxPlayers < 1 || maxPlayers > 50) { fail(res, 'INVALID_INPUT', 'Игроки: 1-50', 400); return; }
 
     const roomId = uuid();
     const inviteCode = uuid().slice(0, 8).toUpperCase();
@@ -40,10 +41,10 @@ roomsRouter.post('/', authMiddleware, async (req: Request, res: Response) => {
     }
 
     const result = await query('SELECT * FROM rooms WHERE id = $1', [roomId]);
-    res.status(201).json(result.rows[0]);
+    ok(res, result.rows[0], 201);
   } catch (err: any) {
     console.error('Create room error:', err.message);
-    res.status(500).json({ error: 'Ошибка создания комнаты' });
+    fail(res, 'SERVER_ERROR', 'Ошибка создания комнаты', 500);
   }
 });
 
@@ -68,10 +69,10 @@ roomsRouter.get('/', optionalAuth, async (req: Request, res: Response) => {
     sql += ' ORDER BY r.created_at DESC LIMIT 30';
 
     const result = await query(sql, params);
-    res.json(result.rows);
+    ok(res, result.rows);
   } catch (err: any) {
     console.error('List rooms error:', err.message);
-    res.status(500).json({ error: 'Ошибка получения списка комнат' });
+    fail(res, 'SERVER_ERROR', 'Ошибка получения списка комнат', 500);
   }
 });
 
@@ -86,10 +87,10 @@ roomsRouter.get('/my', authMiddleware, async (req: Request, res: Response) => {
        WHERE rp.user_id = $1 ORDER BY r.updated_at DESC`,
       [req.user!.userId]
     );
-    res.json(result.rows);
+    ok(res, result.rows);
   } catch (err: any) {
     console.error('My rooms error:', err.message);
-    res.status(500).json({ error: 'Ошибка получения комнат' });
+    fail(res, 'SERVER_ERROR', 'Ошибка получения комнат', 500);
   }
 });
 
@@ -106,13 +107,13 @@ roomsRouter.get('/:id', optionalAuth, async (req: Request, res: Response) => {
     );
 
     if (result.rows.length === 0) {
-      res.status(404).json({ error: 'Комната не найдена' }); return;
+      fail(res, 'NOT_FOUND', 'Комната не найдена', 404); return;
     }
 
-    res.json(result.rows[0]);
+    ok(res, result.rows[0]);
   } catch (err: any) {
     console.error('Get room error:', err.message);
-    res.status(500).json({ error: 'Ошибка получения комнаты' });
+    fail(res, 'SERVER_ERROR', 'Ошибка получения комнаты', 500);
   }
 });
 
@@ -121,21 +122,21 @@ roomsRouter.post('/join/:code', authMiddleware, async (req: Request, res: Respon
   try {
     const room = await query('SELECT * FROM rooms WHERE invite_code = $1', [(req.params.code as string)]);
 
-    if (room.rows.length === 0) { res.status(404).json({ error: 'Комната не найдена' }); return; }
+    if (room.rows.length === 0) { fail(res, 'NOT_FOUND', 'Комната не найдена', 404); return; }
 
     const r = room.rows[0];
 
     // Password check
     if (r.password_hash) {
       const { password } = req.body;
-      if (!password) { res.status(403).json({ error: 'Требуется пароль', needPassword: true }); return; }
+      if (!password) { fail(res, 'FORBIDDEN', 'Требуется пароль', 403); return; }
       const bcrypt = require('bcryptjs');
       const valid = await bcrypt.compare(password, r.password_hash);
-      if (!valid) { res.status(403).json({ error: 'Неверный пароль' }); return; }
+      if (!valid) { fail(res, 'FORBIDDEN', 'Неверный пароль', 403); return; }
     }
 
     if (r.expires_at && new Date(r.expires_at) < new Date()) {
-      res.status(410).json({ error: 'Комната истекла' }); return;
+      fail(res, 'GONE', 'Комната истекла', 410); return;
     }
     const existing = await query(
       'SELECT * FROM room_participants WHERE room_id = $1 AND user_id = $2',
@@ -145,7 +146,7 @@ roomsRouter.post('/join/:code', authMiddleware, async (req: Request, res: Respon
     if (existing.rows.length === 0) {
       const count = await query('SELECT COUNT(*) FROM room_participants WHERE room_id = $1', [r.id]);
       if (parseInt(count.rows[0].count) >= r.max_players) {
-        res.status(403).json({ error: 'Комната заполнена' }); return;
+        fail(res, 'FORBIDDEN', 'Комната заполнена', 403); return;
       }
 
       await query(
@@ -155,10 +156,10 @@ roomsRouter.post('/join/:code', authMiddleware, async (req: Request, res: Respon
     }
 
     await query('UPDATE rooms SET updated_at = NOW() WHERE id = $1', [r.id]);
-    res.json(r);
+    ok(res, r);
   } catch (err: any) {
     console.error('Join room error:', err.message);
-    res.status(500).json({ error: 'Ошибка входа в комнату' });
+    fail(res, 'SERVER_ERROR', 'Ошибка входа в комнату', 500);
   }
 });
 
@@ -170,14 +171,14 @@ roomsRouter.delete('/:id', authMiddleware, async (req: Request, res: Response) =
     ]);
 
     if (room.rows.length === 0) {
-      res.status(403).json({ error: 'Нет прав на удаление' }); return;
+      fail(res, 'FORBIDDEN', 'Нет прав на удаление', 403); return;
     }
 
     await query('DELETE FROM rooms WHERE id = $1', [(req.params.id as string)]);
-    res.json({ success: true });
+    ok(res, {});
   } catch (err: any) {
     console.error('Delete room error:', err.message);
-    res.status(500).json({ error: 'Ошибка удаления комнаты' });
+    fail(res, 'SERVER_ERROR', 'Ошибка удаления комнаты', 500);
   }
 });
 
@@ -185,10 +186,10 @@ roomsRouter.delete('/:id', authMiddleware, async (req: Request, res: Response) =
 roomsRouter.get('/:id/tokens', optionalAuth, async (req: Request, res: Response) => {
   try {
     const result = await query('SELECT * FROM tokens WHERE room_id = $1 ORDER BY layer, created_at', [(req.params.id as string)]);
-    res.json(result.rows);
+    ok(res, result.rows);
   } catch (err: any) {
     console.error('Tokens error:', err.message);
-    res.status(500).json({ error: 'Ошибка получения токенов' });
+    fail(res, 'SERVER_ERROR', 'Ошибка получения токенов', 500);
   }
 });
 
@@ -201,13 +202,13 @@ roomsRouter.get('/:id/scenes', optionalAuth, async (req: Request, res: Response)
       const id = uuid();
       await query("INSERT INTO scenes (id, room_id, name, sort_order) VALUES ($1,$2,'Сцена 1',0)", [id, rid]);
       const s = await query('SELECT * FROM scenes WHERE id = $1', [id]);
-      res.json(s.rows);
+      ok(res, s.rows);
       return;
     }
-    res.json(result.rows);
+    ok(res, result.rows);
   } catch (err: any) {
     console.error('Scenes error:', err.message);
-    res.status(500).json({ error: 'Ошибка загрузки сцен' });
+    fail(res, 'SERVER_ERROR', 'Ошибка загрузки сцен', 500);
   }
 });
 
@@ -219,10 +220,10 @@ roomsRouter.post('/:id/scenes', authMiddleware, async (req: Request, res: Respon
     const max = await query('SELECT COALESCE(MAX(sort_order),0)+1 as n FROM scenes WHERE room_id = $1', [rid]);
     await query('INSERT INTO scenes (id, room_id, name, sort_order) VALUES ($1,$2,$3,$4)', [id, rid, name || 'Новая сцена', max.rows[0].n]);
     const result = await query('SELECT * FROM scenes WHERE id = $1', [id]);
-    res.status(201).json(result.rows[0]);
+    ok(res, result.rows[0], 201);
   } catch (err: any) {
     console.error('Create scene error:', err.message);
-    res.status(500).json({ error: 'Ошибка создания сцены' });
+    fail(res, 'SERVER_ERROR', 'Ошибка создания сцены', 500);
   }
 });
 
@@ -236,20 +237,20 @@ roomsRouter.patch('/:id/scenes/:sceneId', authMiddleware, async (req: Request, r
        WHERE id=$8 AND room_id=$9`,
       [name, mapUrl, gridType, gridSize, gridVisible, gridOffsetX, gridOffsetY, (req.params.sceneId as string), (req.params.id as string)]
     );
-    res.json({ success: true });
+    ok(res, {});
   } catch (err: any) {
     console.error('Patch scene error:', err.message);
-    res.status(500).json({ error: 'Ошибка обновления сцены' });
+    fail(res, 'SERVER_ERROR', 'Ошибка обновления сцены', 500);
   }
 });
 
 roomsRouter.delete('/:id/scenes/:sceneId', authMiddleware, async (req: Request, res: Response) => {
   try {
     await query('DELETE FROM scenes WHERE id=$1 AND room_id=$2', [(req.params.sceneId as string), (req.params.id as string)]);
-    res.json({ success: true });
+    ok(res, {});
   } catch (err: any) {
     console.error('Delete scene error:', err.message);
-    res.status(500).json({ error: 'Ошибка удаления сцены' });
+    fail(res, 'SERVER_ERROR', 'Ошибка удаления сцены', 500);
   }
 });
 
@@ -262,9 +263,9 @@ roomsRouter.get('/:id/messages', optionalAuth, async (req: Request, res: Respons
        WHERE m.room_id = $1 ORDER BY m.created_at DESC LIMIT $2`,
       [(req.params.id as string), limit]
     );
-    res.json(result.rows.reverse());
+    ok(res, result.rows.reverse());
   } catch (err: any) {
     console.error('Messages error:', err.message);
-    res.status(500).json({ error: 'Ошибка получения сообщений' });
+    fail(res, 'SERVER_ERROR', 'Ошибка получения сообщений', 500);
   }
 });

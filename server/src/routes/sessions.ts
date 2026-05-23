@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import { v4 as uuid } from 'uuid';
 import { pool, query } from '../config/database';
 import { authMiddleware, optionalAuth } from '../middleware/auth';
+import { ok, fail } from '../middleware/response';
 
 export const sessionsRouter = Router();
 
@@ -18,10 +19,10 @@ sessionsRouter.get('/', optionalAuth, async (_req: Request, res: Response) => {
        WHERE s.status = 'open' AND s.scheduled_at > NOW()
        ORDER BY s.scheduled_at ASC LIMIT 20`,
     );
-    res.json(result.rows);
+    ok(res, result.rows);
   } catch (err: any) {
     console.error('Sessions list:', err.message);
-    res.status(500).json({ error: 'Ошибка загрузки сессий' });
+    fail(res, 'SERVER_ERROR', 'Ошибка загрузки сессий', 500);
   }
 });
 
@@ -31,10 +32,10 @@ sessionsRouter.post('/', authMiddleware, async (req: Request, res: Response) => 
   try {
     const { title, description, scheduledAt, maxPlayers = 4, system = 'D&D 5e' } = req.body;
     if (!title || !scheduledAt) {
-      res.status(400).json({ error: 'Название и дата обязательны' }); return;
+      fail(res, 'INVALID_INPUT', 'Название и дата обязательны', 400); return;
     }
     if (maxPlayers < 1 || maxPlayers > 20) {
-      res.status(400).json({ error: 'Максимум игроков: 1-20' }); return;
+      fail(res, 'INVALID_INPUT', 'Максимум игроков: 1-20', 400); return;
     }
 
     const id = uuid();
@@ -85,11 +86,11 @@ sessionsRouter.post('/', authMiddleware, async (req: Request, res: Response) => 
     await client.query('COMMIT');
 
     const result = await query('SELECT * FROM sessions_planned WHERE id = $1', [id]);
-    res.status(201).json(result.rows[0]);
+    ok(res, result.rows[0], 201);
   } catch (err: any) {
     await client.query('ROLLBACK').catch((rollbackErr) => { console.error('Rollback error:', rollbackErr instanceof Error ? rollbackErr.message : rollbackErr); });
     console.error('Session create error:', err.message);
-    res.status(500).json({ error: 'Ошибка создания сессии' });
+    fail(res, 'SERVER_ERROR', 'Ошибка создания сессии', 500);
   } finally {
     client.release();
   }
@@ -101,17 +102,17 @@ sessionsRouter.post('/:id/apply', authMiddleware, async (req: Request, res: Resp
     const { message } = req.body;
     const sid = req.params.id as string;
     const session = await query('SELECT * FROM sessions_planned WHERE id = $1', [sid]);
-    if (session.rows.length === 0) { res.status(404).json({ error: 'Сессия не найдена' }); return; }
-    if (session.rows[0].status !== 'open') { res.status(400).json({ error: 'Сессия недоступна' }); return; }
+    if (session.rows.length === 0) { fail(res, 'NOT_FOUND', 'Сессия не найдена', 404); return; }
+    if (session.rows[0].status !== 'open') { fail(res, 'INVALID_INPUT', 'Сессия недоступна', 400); return; }
 
     await query(
       'INSERT INTO session_applications (session_id, user_id, message) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING',
       [sid, req.user!.userId, message || '']
     );
-    res.json({ success: true });
+    ok(res, {});
   } catch (err: any) {
-    if (err.code === '23505') res.json({ success: true, message: 'Вы уже подали заявку' });
-    else { console.error('Apply error:', err.message); res.status(500).json({ error: 'Ошибка подачи заявки' }); }
+    if (err.code === '23505') ok(res, { message: 'Вы уже подали заявку' });
+    else { console.error('Apply error:', err.message); fail(res, 'SERVER_ERROR', 'Ошибка подачи заявки', 500); }
   }
 });
 
@@ -120,11 +121,11 @@ sessionsRouter.patch('/:id/applications/:appId', authMiddleware, async (req: Req
   try {
     const { status } = req.body;
     if (!['accepted', 'rejected'].includes(status)) {
-      res.status(400).json({ error: 'Статус: accepted или rejected' }); return;
+      fail(res, 'INVALID_INPUT', 'Статус: accepted или rejected', 400); return;
     }
     const sid = req.params.id as string;
     const session = await query('SELECT * FROM sessions_planned WHERE id = $1 AND master_id = $2', [sid, req.user!.userId]);
-    if (session.rows.length === 0) { res.status(403).json({ error: 'Только мастер может принимать заявки' }); return; }
+    if (session.rows.length === 0) { fail(res, 'FORBIDDEN', 'Только мастер может принимать заявки', 403); return; }
 
     await query('UPDATE session_applications SET status = $1 WHERE id = $2 AND session_id = $3',
       [status, req.params.appId as string, sid]);
@@ -149,10 +150,10 @@ sessionsRouter.patch('/:id/applications/:appId', authMiddleware, async (req: Req
         }
       }
     }
-    res.json({ success: true });
+    ok(res, {});
   } catch (err: any) {
     console.error('App patch error:', err.message);
-    res.status(500).json({ error: 'Ошибка обновления заявки' });
+    fail(res, 'SERVER_ERROR', 'Ошибка обновления заявки', 500);
   }
 });
 
@@ -169,10 +170,10 @@ sessionsRouter.get('/my', authMiddleware, async (req: Request, res: Response) =>
        ORDER BY s.scheduled_at DESC LIMIT 20`,
       [req.user!.userId]
     );
-    res.json(result.rows);
+    ok(res, result.rows);
   } catch (err: any) {
     console.error('Sessions my:', err.message);
-    res.status(500).json({ error: 'Ошибка загрузки сессий' });
+    fail(res, 'SERVER_ERROR', 'Ошибка загрузки сессий', 500);
   }
 });
 
@@ -181,15 +182,15 @@ sessionsRouter.get('/:id/applications', authMiddleware, async (req: Request, res
   try {
     const sid = req.params.id as string;
     const session = await query('SELECT * FROM sessions_planned WHERE id = $1 AND master_id = $2', [sid, req.user!.userId]);
-    if (session.rows.length === 0) { res.status(403).json({ error: 'Только мастер может видеть заявки' }); return; }
+    if (session.rows.length === 0) { fail(res, 'FORBIDDEN', 'Только мастер может видеть заявки', 403); return; }
     const result = await query(
       'SELECT sa.*, u.username, u.avatar_url FROM session_applications sa JOIN users u ON sa.user_id = u.id WHERE sa.session_id = $1 ORDER BY sa.created_at DESC',
       [sid]
     );
-    res.json(result.rows);
+    ok(res, result.rows);
   } catch (err: any) {
     console.error('Applications error:', err.message);
-    res.status(500).json({ error: 'Ошибка загрузки заявок' });
+    fail(res, 'SERVER_ERROR', 'Ошибка загрузки заявок', 500);
   }
 });
 
@@ -199,17 +200,17 @@ sessionsRouter.get('/:id/chat', authMiddleware, async (req: Request, res: Respon
       'SELECT sc.*, u.username FROM session_chats sc JOIN users u ON sc.user_id = u.id WHERE sc.session_id = $1 ORDER BY sc.created_at ASC LIMIT 100',
       [req.params.id as string]
     );
-    res.json(result.rows);
+    ok(res, result.rows);
   } catch (err: any) {
     console.error('Session chat error:', err.message);
-    res.status(500).json({ error: 'Ошибка загрузки чата' });
+    fail(res, 'SERVER_ERROR', 'Ошибка загрузки чата', 500);
   }
 });
 
 sessionsRouter.post('/:id/chat', authMiddleware, async (req: Request, res: Response) => {
   try {
     const { content } = req.body;
-    if (!content?.trim()) { res.status(400).json({ error: 'Сообщение не может быть пустым' }); return; }
+    if (!content?.trim()) { fail(res, 'INVALID_INPUT', 'Сообщение не может быть пустым', 400); return; }
     const id = uuid();
     await query(
       'INSERT INTO session_chats (id, session_id, user_id, content) VALUES ($1, $2, $3, $4)',
@@ -219,9 +220,9 @@ sessionsRouter.post('/:id/chat', authMiddleware, async (req: Request, res: Respo
       'SELECT sc.*, u.username FROM session_chats sc JOIN users u ON sc.user_id = u.id WHERE sc.id = $1',
       [id]
     );
-    res.status(201).json(result.rows[0]);
+    ok(res, result.rows[0], 201);
   } catch (err: any) {
     console.error('Session chat send:', err.message);
-    res.status(500).json({ error: 'Ошибка отправки сообщения' });
+    fail(res, 'SERVER_ERROR', 'Ошибка отправки сообщения', 500);
   }
 });

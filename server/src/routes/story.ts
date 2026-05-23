@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import { v4 as uuid } from 'uuid';
 import { query } from '../config/database';
 import { authMiddleware } from '../middleware/auth';
+import { ok, fail } from '../middleware/response';
 
 export const storyRouter = Router();
 
@@ -43,16 +44,16 @@ storyRouter.post('/', authMiddleware, async (req: Request, res: Response) => {
       [sessionId]
     );
 
-    res.status(201).json({ ...result.rows[0], initialNarration: 'Приключение начинается...' });
+    ok(res, { ...result.rows[0], initialNarration: 'Приключение начинается...' }, 201);
   } catch (err: any) {
-    res.status(500).json({ error: 'Ошибка создания истории' });
+    fail(res, 'SERVER_ERROR', 'Ошибка создания истории', 500);
   }
 });
 
 storyRouter.post('/join-by-code/:code', authMiddleware, async (req: Request, res: Response) => {
   try {
     const session = await query('SELECT * FROM story_sessions WHERE invite_code = $1', [req.params.code]);
-    if (session.rows.length === 0) { res.status(404).json({ error: 'Сессия не найдена' }); return; }
+    if (session.rows.length === 0) { fail(res, 'NOT_FOUND', 'Сессия не найдена', 404); return; }
 
     await query(
       'INSERT INTO story_players (session_id, user_id, character_name) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING',
@@ -63,16 +64,16 @@ storyRouter.post('/join-by-code/:code', authMiddleware, async (req: Request, res
     await query('UPDATE story_sessions SET player_count = $1, updated_at = NOW() WHERE id = $2',
       [parseInt(count.rows[0].c), session.rows[0].id]);
 
-    res.json({ sessionId: session.rows[0].id, success: true });
+    ok(res, { sessionId: session.rows[0].id });
   } catch (err: any) {
-    res.status(500).json({ error: 'Ошибка входа в сессию' });
+    fail(res, 'SERVER_ERROR', 'Ошибка входа в сессию', 500);
   }
 });
 
 storyRouter.post('/:id/join', authMiddleware, async (req: Request, res: Response) => {
   try {
     const session = await query('SELECT * FROM story_sessions WHERE id = $1', [req.params.id]);
-    if (session.rows.length === 0) { res.status(404).json({ error: 'Сессия не найдена' }); return; }
+    if (session.rows.length === 0) { fail(res, 'NOT_FOUND', 'Сессия не найдена', 404); return; }
 
     await query(
       'INSERT INTO story_players (session_id, user_id, character_name) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING',
@@ -90,9 +91,9 @@ storyRouter.post('/:id/join', authMiddleware, async (req: Request, res: Response
       [req.params.id]
     );
 
-    res.json({ success: true, players: players.rows });
+    ok(res, { players: players.rows });
   } catch (err: any) {
-    res.status(500).json({ error: 'Ошибка входа в сессию' });
+    fail(res, 'SERVER_ERROR', 'Ошибка входа в сессию', 500);
   }
 });
 
@@ -103,7 +104,7 @@ storyRouter.get('/:id/state', authMiddleware, async (req: Request, res: Response
        FROM story_sessions ss JOIN story_state sst ON ss.id = sst.session_id WHERE ss.id = $1`,
       [req.params.id]
     );
-    if (result.rows.length === 0) { res.status(404).json({ error: 'Сессия не найдена' }); return; }
+    if (result.rows.length === 0) { fail(res, 'NOT_FOUND', 'Сессия не найдена', 404); return; }
 
     const players = await query(
       `SELECT u.id, u.username, u.avatar_url, sp.character_name, sp.hp, sp.max_hp, sp.ac, sp.inventory
@@ -111,9 +112,9 @@ storyRouter.get('/:id/state', authMiddleware, async (req: Request, res: Response
       [req.params.id]
     );
 
-    res.json({ ...result.rows[0], players: players.rows });
+    ok(res, { ...result.rows[0], players: players.rows });
   } catch (err: any) {
-    res.status(500).json({ error: 'Ошибка загрузки состояния' });
+    fail(res, 'SERVER_ERROR', 'Ошибка загрузки состояния', 500);
   }
 });
 
@@ -127,9 +128,9 @@ storyRouter.get('/my', authMiddleware, async (req: Request, res: Response) => {
        ORDER BY ss.updated_at DESC LIMIT 20`,
        [req.user!.userId]
     );
-    res.json(result.rows);
+    ok(res, result.rows);
   } catch (err: any) {
-    res.status(500).json({ error: 'Ошибка загрузки историй' });
+    fail(res, 'SERVER_ERROR', 'Ошибка загрузки историй', 500);
   }
 });
 
@@ -141,14 +142,14 @@ storyRouter.get('/public', async (_req: Request, res: Response) => {
        FROM story_sessions ss JOIN users u ON ss.owner_id = u.id
        WHERE ss.status IN ('active', 'lobby') ORDER BY ss.created_at DESC LIMIT 10`
     );
-    res.json(result.rows);
-  } catch (err) { console.error('Public stories error:', err instanceof Error ? err.message : err); res.status(500).json({ success: false, error: { code: 'SERVER_ERROR', message: 'Ошибка загрузки историй' } }); }
+    ok(res, result.rows);
+  } catch (err) { console.error('Public stories error:', err instanceof Error ? err.message : err); fail(res, 'SERVER_ERROR', 'Ошибка загрузки историй', 500); }
 });
 
 storyRouter.post('/:id/end', authMiddleware, async (req: Request, res: Response) => {
   try {
     const state = await query('SELECT * FROM story_state WHERE session_id = $1', [req.params.id]);
-    if (state.rows.length === 0) { res.status(404).json({ error: 'Сессия не найдена' }); return; }
+    if (state.rows.length === 0) { fail(res, 'NOT_FOUND', 'Сессия не найдена', 404); return; }
 
     const epilogue = 'Так завершилось это приключение. Герои вернулись домой с воспоминаниями о пережитых испытаниях.';
 
@@ -162,8 +163,8 @@ storyRouter.post('/:id/end', authMiddleware, async (req: Request, res: Response)
       [req.params.id, 'session_end', epilogue]
     );
 
-    res.json({ epilogue, success: true });
+    ok(res, { epilogue });
   } catch (err: any) {
-    res.status(500).json({ error: 'Ошибка завершения истории' });
+    fail(res, 'SERVER_ERROR', 'Ошибка завершения истории', 500);
   }
 });

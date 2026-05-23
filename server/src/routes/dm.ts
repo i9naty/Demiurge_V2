@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import { v4 as uuid } from 'uuid';
 import { query } from '../config/database';
 import { authMiddleware } from '../middleware/auth';
+import { ok, fail } from '../middleware/response';
 
 export const dmRouter = Router();
 
@@ -15,10 +16,10 @@ dmRouter.get('/search/:query', authMiddleware, async (req: Request, res: Respons
        LIMIT 10`,
       [q, req.user!.userId]
     );
-    res.json(result.rows);
+    ok(res, result.rows);
   } catch (err: any) {
     console.error('DM search error:', err.message);
-    res.status(500).json({ error: 'Ошибка поиска' });
+    fail(res, 'SERVER_ERROR', 'Ошибка поиска', 500);
   }
 });
 
@@ -29,10 +30,10 @@ dmRouter.get('/unread/count', authMiddleware, async (req: Request, res: Response
       'SELECT COUNT(*) FROM direct_messages WHERE receiver_id = $1 AND is_read = false',
       [req.user!.userId]
     );
-    res.json({ count: parseInt(result.rows[0].count) });
+    ok(res, { count: parseInt(result.rows[0].count) });
   } catch (err: any) {
     console.error('DM unread error:', err.message);
-    res.json({ count: 0 });
+    ok(res, { count: 0 });
   }
 });
 
@@ -57,10 +58,10 @@ dmRouter.get('/conversations', authMiddleware, async (req: Request, res: Respons
        ORDER BY u.id, last_at DESC`,
       [req.user!.userId]
     );
-    res.json(result.rows);
+    ok(res, result.rows);
   } catch (err: any) {
     console.error('DM conversations error:', err.message);
-    res.status(500).json({ error: 'Ошибка загрузки диалогов' });
+    fail(res, 'SERVER_ERROR', 'Ошибка загрузки диалогов', 500);
   }
 });
 
@@ -69,7 +70,7 @@ dmRouter.get('/:userId', authMiddleware, async (req: Request, res: Response) => 
   try {
     const targetId = req.params.userId as string;
     if (targetId === 'search' || targetId.startsWith('unread')) {
-      res.status(400).json({ error: 'Некорректный ID пользователя' });
+      fail(res, 'INVALID_INPUT', 'Некорректный ID пользователя', 400);
       return;
     }
 
@@ -87,10 +88,10 @@ dmRouter.get('/:userId', authMiddleware, async (req: Request, res: Response) => 
        ORDER BY dm.created_at ASC LIMIT 100`,
       [req.user!.userId, targetId]
     );
-    res.json(result.rows);
+    ok(res, result.rows);
   } catch (err: any) {
     console.error('DM messages error:', err.message);
-    res.status(500).json({ error: 'Ошибка загрузки сообщений' });
+    fail(res, 'SERVER_ERROR', 'Ошибка загрузки сообщений', 500);
   }
 });
 
@@ -99,11 +100,11 @@ dmRouter.post('/:userId', authMiddleware, async (req: Request, res: Response) =>
   try {
     const { content } = req.body;
     if (!content || !content.trim()) {
-      res.status(400).json({ error: 'Сообщение не может быть пустым' });
+      fail(res, 'INVALID_INPUT', 'Сообщение не может быть пустым', 400);
       return;
     }
     if (content.length > 5000) {
-      res.status(400).json({ error: 'Сообщение слишком длинное' });
+      fail(res, 'INVALID_INPUT', 'Сообщение слишком длинное', 400);
       return;
     }
 
@@ -119,9 +120,9 @@ dmRouter.post('/:userId', authMiddleware, async (req: Request, res: Response) =>
       [id]
     );
 
-    res.status(201).json(result.rows[0]);
+    ok(res, result.rows[0], 201);
   } catch (err: any) {
     console.error('DM send error:', err.message);
-    res.status(500).json({ error: 'Ошибка отправки сообщения' });
+    fail(res, 'SERVER_ERROR', 'Ошибка отправки сообщения', 500);
   }
 });
