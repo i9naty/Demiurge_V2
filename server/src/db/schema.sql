@@ -707,3 +707,22 @@ CREATE INDEX IF NOT EXISTS idx_compendium_monsters_type ON compendium_monsters(t
 CREATE INDEX IF NOT EXISTS idx_compendium_spells_level ON compendium_spells(level);
 CREATE INDEX IF NOT EXISTS idx_compendium_spells_school ON compendium_spells(school);
 CREATE INDEX IF NOT EXISTS idx_compendium_items_type ON compendium_items(type);
+
+-- Character sheets
+CREATE TABLE IF NOT EXISTS character_sheets (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  name VARCHAR(128) NOT NULL,
+  race VARCHAR(32) DEFAULT 'human',
+  class VARCHAR(32) DEFAULT 'fighter',
+  level INT DEFAULT 1,
+  stats JSONB DEFAULT '{}',
+  spells JSONB DEFAULT '[]',
+  inventory JSONB DEFAULT '[]',
+  room_id UUID REFERENCES rooms(id) ON DELETE SET NULL,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_character_sheets_user ON character_sheets(user_id);
+CREATE INDEX IF NOT EXISTS idx_character_sheets_room ON character_sheets(room_id);

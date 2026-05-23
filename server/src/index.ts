@@ -23,6 +23,7 @@ import { discordRouter } from './routes/discord';
 import { storyRouter } from './routes/story';
 import { gameRouter } from './routes/game';
 import { compendiumRouter, seedCompendium } from './routes/compendium';
+import { characterRouter } from './routes/characters';
 import { setupSocket } from './socket';
 import { errorHandler, requestIdMiddleware, notFoundHandler } from './middleware/errorHandler';
 
@@ -103,6 +104,7 @@ app.use('/api/discord', apiLimiter, discordRouter);
 app.use('/api/story', apiLimiter, storyRouter);
 app.use('/api/game', apiLimiter, gameRouter);
 app.use('/api/compendium', apiLimiter, compendiumRouter);
+app.use('/api/characters', apiLimiter, characterRouter);
 
 // Здоровье сервера
 app.get('/api/health', async (_req, res) => {
