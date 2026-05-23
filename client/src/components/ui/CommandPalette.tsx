@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, Home, MessageCircle, Swords, Scroll, Users, Globe, Sparkles, Volume2, Zap } from 'lucide-react';
+import { Search, Home, MessageCircle, Swords, Scroll, Users, Globe, Sparkles, Volume2 } from 'lucide-react';
 
 interface Command {
   id: string; label: string; desc: string; icon: any; action: () => void; category: string;
@@ -23,7 +23,6 @@ export function useCommandPalette() {
 export function CommandPalette({ open, onClose }: { open: boolean; onClose: () => void }) {
   const [query, setQuery] = useState('');
   const navigate = useNavigate();
-  const location = useLocation();
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => { if (open) { setQuery(''); setTimeout(() => inputRef.current?.focus(), 50); } }, [open]);
@@ -47,7 +46,7 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
     : allCommands;
 
   const grouped: Record<string, Command[]> = {};
-  filtered.forEach(c => { if (!grouped[c.category]) grouped[c.category] = []; grouped[c.category].push(c); });
+  filtered.forEach(c => { if (!grouped[c.category]) grouped[c.category] = []; grouped[c.category]!.push(c); });
 
   return (
     <AnimatePresence>

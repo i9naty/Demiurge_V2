@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, Swords, Shield, Heart, Zap, X, Plus, Skull, Sparkles } from 'lucide-react';
+import { Search, Shield, Heart, Plus, Skull } from 'lucide-react';
 
 interface Monster {
   name: string; type: string; cr: number | string; hp: number; ac: number;

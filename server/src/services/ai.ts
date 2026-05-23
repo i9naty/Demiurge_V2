@@ -1,6 +1,4 @@
-
 import { env } from '../config/env';
-import { query } from '../config/database';
 
 const AI_BASE = env.ROUTERAI_BASE_URL;
 const AI_KEY = env.ROUTERAI_API_KEY;
@@ -120,7 +118,7 @@ function generateFallback(w: number, h: number, seed: number, biome: string, den
   const resources = ['wood','stone','ore','food','herbs','gold','gems','mana_crystal',null,null,null];
   const tiles = [];
   for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
-    const r = rand(x, y), t = terrains[Math.floor(r * terrains.length)];
+    const r = rand(x, y), t = (terrains![Math.floor(r * terrains!.length)] ?? terrains![0] ?? 'plains');
     const res = r > (0.8 / densityMult) ? resources[Math.floor(rand(x+1,y) * resources.length)] : null;
     tiles.push({ x, y, terrain: t, elevation: parseFloat((rand(x, y+1) * 2 - 0.5).toFixed(1)), resource_type: res, resource_amount: res ? Math.floor(rand(x+2, y) * 8 * densityMult) + 1 : 0 });
   }

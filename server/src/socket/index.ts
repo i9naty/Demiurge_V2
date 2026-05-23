@@ -4,7 +4,7 @@ import { v4 as uuid } from 'uuid';
 import bcrypt from 'bcryptjs';
 import { query } from '../config/database';
 import { env } from '../config/env';
-import { generateWorldEvents, generateNPCResponse, callAI } from '../services/ai';
+import { generateWorldEvents, generateNPCResponse } from '../services/ai';
 import { getAssetIdList } from '../services/assetScanner';
 import { generateWorld, generateFallbackWorld, processGameAction, smartFallback } from '../services/storyAI';
 import { incrementStat } from '../routes/achievements';
@@ -97,7 +97,7 @@ export function setupSocket(io: Server) {
         const diceMatch = content.match(/\/roll\s+(\d+)?d(\d+)([+-]\d+)?/i);
         if (diceMatch) {
           const count = Math.min(parseInt(diceMatch[1] || '1'), 100);
-          const sides = Math.min(parseInt(diceMatch[2]), 1000);
+          const sides = Math.min(parseInt(diceMatch[2]!), 1000);
           const modifier = diceMatch[3] ? parseInt(diceMatch[3]) : 0;
           const rolls: number[] = [];
           for (let i = 0; i < count; i++) rolls.push(Math.floor(Math.random() * sides) + 1);
@@ -114,7 +114,7 @@ export function setupSocket(io: Server) {
       if (processedContent.startsWith('/w ') || processedContent.startsWith('/whisper ')) {
         const parts = processedContent.slice(processedContent.startsWith('/w ') ? 3 : 9).match(/^@?(\S+)\s(.+)/s);
         if (parts) {
-          const targetName = parts[1], whisperMsg = parts[2];
+          const targetName = parts[1]!, whisperMsg = parts[2]!;
           const targetSockets = (await io.fetchSockets()).filter(s => {
             const su = connectedUsers.get(s.id);
             return su?.username === targetName || su?.userId?.startsWith(targetName);

@@ -2,8 +2,6 @@ import { Router, Request, Response } from 'express';
 import { v4 as uuid } from 'uuid';
 import { query } from '../config/database';
 import { authMiddleware } from '../middleware/auth';
-import { getAssetIndex, getAssetIdList, getAssetById } from '../services/assetScanner';
-import { callAI } from '../services/ai';
 
 export const gameRouter = Router();
 

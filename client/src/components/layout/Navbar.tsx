@@ -3,7 +3,7 @@ import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useStore } from '../../store';
 import {
-  Menu, X, Home, Users, MessageCircle, Search, Plus,
+  Menu, X, Home, MessageCircle, Search, Plus,
   Crown, LogOut, User, Sparkles, DoorOpen, Volume2
 } from 'lucide-react';
 

@@ -53,7 +53,7 @@ paymentsRouter.post('/subscribe', authMiddleware, async (req: Request, res: Resp
         legend: { amount: 1999, description: 'Demiurge Legend' },
       };
 
-      const { amount, description } = prices[tier];
+      const { amount, description } = prices[tier] ?? { amount: 0, description: 'Unknown' };
 
       const response = await fetch('https://api.yookassa.ru/v3/payments', {
         method: 'POST',

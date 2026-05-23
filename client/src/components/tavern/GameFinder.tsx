@@ -2,8 +2,8 @@ import { useState, useEffect } from 'react';
 import { useStore } from '../../store';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  Swords, Calendar, Users, Plus, MessageCircle, X, Clock,
-  Shield, Heart, Sparkles, Send, Eye, Check, User, Loader2, Link2,
+  Swords, Users, Plus, MessageCircle, X, Clock,
+  Sparkles, Send, Check, User, Loader2, Link2,
 } from 'lucide-react';
 
 interface Session {
@@ -222,10 +222,13 @@ export function GameFinder() {
                 </div>
 
                 {/* Applications for master */}
-                {isMaster && appsData[s.id]?.length > 0 && (
+                {(() => {
+                  const apps = appsData[s.id];
+                  if (!isMaster || !apps || apps.length === 0) return null;
+                  return (
                   <div className="mt-3 pt-3 border-t border-[#1a1a2e]">
-                    <p className="text-[9px] font-mono text-zinc-500 mb-2">Заявки ({appsData[s.id].length}):</p>
-                    {appsData[s.id].map((a: any) => (
+                    <p className="text-[9px] font-mono text-zinc-500 mb-2">Заявки ({apps.length}):</p>
+                    {apps.map((a: any) => (
                       <div key={a.id} className="flex items-center gap-2 py-1.5 px-2 rounded-lg hover:bg-white/[0.02]">
                         <div className="w-6 h-6 rounded-full bg-purple-600/20 flex items-center justify-center"><User size={10} className="text-violet-400" /></div>
                         <span className="text-[10px] font-mono text-zinc-300">{a.username}</span>
@@ -249,7 +252,8 @@ export function GameFinder() {
                       </div>
                     ))}
                   </div>
-                )}
+                  );
+                })()}
               </div>
             );
           })}

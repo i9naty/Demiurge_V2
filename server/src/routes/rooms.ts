@@ -8,7 +8,7 @@ export const roomsRouter = Router();
 // Создать комнату
 roomsRouter.post('/', authMiddleware, async (req: Request, res: Response) => {
   try {
-    const { name, description, mode = 'vtt', isPublic = false, maxPlayers = 8, gameType = 'D&D 5e', password, expiresIn } = req.body;
+    const { name, description, mode = 'vtt', isPublic = false, maxPlayers = 8, gameType = 'D&D 5e', password: _password, expiresIn } = req.body;
     if (!name?.trim()) { res.status(400).json({ error: 'Название обязательно' }); return; }
     if (!['vtt', 'world'].includes(mode)) { res.status(400).json({ error: 'vtt или world' }); return; }
     if (maxPlayers < 1 || maxPlayers > 50) { res.status(400).json({ error: 'Игроки: 1-50' }); return; }

@@ -5,8 +5,6 @@ import { authMiddleware } from '../middleware/auth';
 
 export const discordRouter = Router();
 
-type P = Record<string, string>;
-
 async function requireMember(userId: string, serverId: string): Promise<boolean> {
   const r = await query('SELECT 1 FROM discord_server_members WHERE server_id = $1 AND user_id = $2', [serverId, userId]);
   return r.rows.length > 0;

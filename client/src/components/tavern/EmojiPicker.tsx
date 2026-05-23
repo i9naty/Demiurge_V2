@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 
 const EMOJI_CATEGORIES: Record<string, { icon: string; emojis: string[] }> = {
   smileys: { icon: '😀', emojis: ['😀','😂','🤣','😍','😎','🤩','😡','😭','🥺','😴','🤔','😅','🥳','😇','🤗','😤'] },

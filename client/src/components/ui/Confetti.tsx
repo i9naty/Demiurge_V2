@@ -28,7 +28,7 @@ export function Confetti({ active = true, count = 80 }: { active?: boolean; coun
         y: -20 - Math.random() * 100,
         vx: (Math.random() - 0.5) * 4,
         vy: Math.random() * 3 + 2,
-        color: colors[Math.floor(Math.random() * colors.length)],
+        color: colors[Math.floor(Math.random() * colors.length)]!,
         size: Math.random() * 8 + 4,
         rotation: Math.random() * 360,
         rotSpeed: (Math.random() - 0.5) * 10,

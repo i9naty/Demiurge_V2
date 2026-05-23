@@ -1,5 +1,4 @@
 import { Router, Request, Response } from 'express';
-import { v4 as uuid } from 'uuid';
 import { query } from '../config/database';
 import { authMiddleware } from '../middleware/auth';
 import { generateWorld } from '../services/ai';
@@ -129,7 +128,7 @@ worldRouter.patch('/:roomId/tiles/:x/:y', authMiddleware, async (req: Request, r
       res.status(403).json({ error: 'Нет доступа' }); return;
     }
     const { terrain, resourceAmount } = req.body;
-    const { roomId, x, y } = req.params;
+    const { roomId } = req.params;
 
     await query(
       `UPDATE world_tiles

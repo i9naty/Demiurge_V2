@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Heart, Shield, Swords, Zap, Footprints, Brain, Eye, X, Plus, Save } from 'lucide-react';
+import { Heart, Shield, Footprints, X, Plus } from 'lucide-react';
 
 interface CharacterData {
   name: string; race: string; cls: string; level: number; xp: number;
@@ -197,7 +197,8 @@ export function CharacterSheet({ character, onClose, onUpdate }: Props) {
                   {Array.from({ length: sl.total }).map((_, j) => (
                     <button key={j} onClick={() => {
                       const spells = [...char.spells];
-                      spells[i] = { ...spells[i], used: j < spells[i].used ? j : j + 1 > spells[i].used ? Math.min(spells[i].total, spells[i].used + 1) : spells[i].used };
+                      const spell = spells[i]!;
+                      spells[i] = { ...spell, used: j < spell.used ? j : j + 1 > spell.used ? Math.min(spell.total, spell.used + 1) : spell.used };
                       update({ spells });
                     }}
                       className={`w-3 h-3 rounded-sm border transition-colors ${

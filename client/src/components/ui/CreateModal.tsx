@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useStore } from '../../store';
 import {
-  Swords, Globe, Scroll, Sparkles, X, Loader2, Users, Map, MessageCircle,
+  Swords, Globe, Scroll, Sparkles, X, Loader2,
 } from 'lucide-react';
 
 const MODES = [

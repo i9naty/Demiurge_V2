@@ -1,10 +1,8 @@
 import { Router, Request, Response } from 'express';
-import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
 import { v4 as uuid } from 'uuid';
 import { query } from '../config/database';
 import { authMiddleware, generateToken, generateRefreshToken, verifyRefreshToken } from '../middleware/auth';
-import { env } from '../config/env';
 import { validate } from '../middleware/validate';
 import { registerSchema, loginSchema } from '../validators';
 

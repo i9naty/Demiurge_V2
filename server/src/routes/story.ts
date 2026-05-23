@@ -150,9 +150,6 @@ storyRouter.post('/:id/end', authMiddleware, async (req: Request, res: Response)
     const state = await query('SELECT * FROM story_state WHERE session_id = $1', [req.params.id]);
     if (state.rows.length === 0) { res.status(404).json({ error: 'Сессия не найдена' }); return; }
 
-    const history = state.rows[0].action_history || [];
-    const memories = await query('SELECT description FROM story_memory WHERE session_id = $1 ORDER BY importance DESC LIMIT 10', [req.params.id]);
-
     const epilogue = 'Так завершилось это приключение. Герои вернулись домой с воспоминаниями о пережитых испытаниях.';
 
     await query(

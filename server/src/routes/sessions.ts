@@ -6,7 +6,7 @@ import { authMiddleware, optionalAuth } from '../middleware/auth';
 export const sessionsRouter = Router();
 
 // List open sessions
-sessionsRouter.get('/', optionalAuth, async (req: Request, res: Response) => {
+sessionsRouter.get('/', optionalAuth, async (_req: Request, res: Response) => {
   try {
     const result = await query(
       `SELECT s.*, u.username as master_name, u.avatar_url as master_avatar,

@@ -1,5 +1,5 @@
 import { callAI } from './ai';
-import { getAssetIdList, getAssetById } from './assetScanner';
+import { getAssetIdList } from './assetScanner';
 
 const MASTER_SYSTEM = (params: {
   genre: string; setting: string; difficulty: string;
@@ -155,14 +155,12 @@ export function generateFallbackWorld(assets: string[], settings: any): any {
   const floorStone = find('floor_stone') || null;
   const floorCave = find('floor_cave') || floorStone;
   const wallStone = find('walls_stone') || find('wall_stone') || null;
-  const snow = find('snow') || null;
   const tree = find('tree') || find('nature_tree') || null;
   const light = find('torch') || find('lantern') || find('light') || null;
   const table = find('table') || null;
   const chair = find('chair') || null;
   const barrel = find('barrel') || null;
   const chest = find('chest') || null;
-  const bookshelf = find('bookshelf') || null;
   const banner = find('banner') || null;
   const size = 40;
   const setting = settings.setting || 'forest';
@@ -172,20 +170,20 @@ export function generateFallbackWorld(assets: string[], settings: any): any {
 
   function rnd(s: number) { const x = Math.sin(s * 12.9898 + s * 78.233) * 43758.5453; return x - Math.floor(x); }
 
-  for (let y = 0; y < size; y++) { map[y] = []; for (let x = 0; x < size; x++) map[y][x] = grass; }
+  for (let y = 0; y < size; y++) { map[y] = []; for (let x = 0; x < size; x++) map[y]![x] = grass as string; }
 
   if (setting === 'forest') {
-    if (water) for (let y = 5; y < 35; y++) { const dx = Math.floor(Math.sin(y * 0.3) * 4); map[y][20 + dx] = water; if (rnd(y * 3) > 0.5) map[y][21 + dx] = water; }
-    if (wetSand) for (let y = 5; y < 35; y++) { const dx = Math.floor(Math.sin(y * 0.3) * 4); if (map[y][19 + dx] === grass) map[y][19 + dx] = wetSand; if (map[y][22 + dx] === grass) map[y][22 + dx] = wetSand; }
-    if (floorWood) for (let dy = 0; dy < 5; dy++) for (let dx = 0; dx < 7; dx++) map[27 + dy][5 + dx] = floorWood;
+    if (water) for (let y = 5; y < 35; y++) { const dx = Math.floor(Math.sin(y * 0.3) * 4); map[y]![20 + dx] = water; if (rnd(y * 3) > 0.5) map[y]![21 + dx] = water; }
+    if (wetSand) for (let y = 5; y < 35; y++) { const dx = Math.floor(Math.sin(y * 0.3) * 4); if (map[y]![19 + dx] === grass) map[y]![19 + dx] = wetSand; if (map[y]![22 + dx] === grass) map[y]![22 + dx] = wetSand; }
+    if (floorWood) for (let dy = 0; dy < 5; dy++) for (let dx = 0; dx < 7; dx++) map[27 + dy]![5 + dx] = floorWood;
     if (table) { objects.push({ id: table, x: 6, y: 28 }); objects.push({ id: table, x: 8, y: 29 }); objects.push({ id: table, x: 7, y: 30 }); }
     if (chair) { objects.push({ id: chair, x: 5, y: 28 }); objects.push({ id: chair, x: 9, y: 29 }); objects.push({ id: chair, x: 6, y: 30 }); objects.push({ id: chair, x: 8, y: 31 }); }
     if (barrel) { objects.push({ id: barrel, x: 10, y: 27 }); objects.push({ id: barrel, x: 11, y: 27 }); }
     if (light) { objects.push({ id: light, x: 5, y: 27 }); objects.push({ id: light, x: 10, y: 28 }); }
-    if (path) { for (let i = 0; i < 15; i++) map[17 + i][8] = path; for (let i = 0; i < 6; i++) map[17][8 - i] = path; map[16][2] = path; map[16][3] = path; }
+    if (path) { for (let i = 0; i < 15; i++) map[17 + i]![8] = path; for (let i = 0; i < 6; i++) map[17]![8 - i] = path; map[16]![2] = path; map[16]![3] = path; }
     if (tree) for (let i = 0; i < 55; i++) { objects.push({ id: tree, x: 3 + Math.floor(Math.abs(rnd(i * 100 + 1)) * 34), y: 3 + Math.floor(Math.abs(rnd(i * 100 + 2)) * 34) }); }
     if (chest) objects.push({ id: chest, x: 34, y: 6 });
-    if (darkStone) for (let i = 0; i < 8; i++) { const sx = 25 + Math.floor(rnd(i * 5) * 12); const sy = 30 + Math.floor(rnd(i * 6) * 8); if (map[sy][sx] === grass) map[sy][sx] = darkStone; }
+    if (darkStone) for (let i = 0; i < 8; i++) { const sx = 25 + Math.floor(rnd(i * 5) * 12); const sy = 30 + Math.floor(rnd(i * 6) * 8); if (map[sy]![sx] === grass) map[sy]![sx] = darkStone; }
     npcs.push({ type: 'npc', name: 'Трактирщица Мира', x: 7, y: 29, dialog: 'Добро пожаловать в таверну «Старый дуб»!', hp: 15, maxHp: 15 });
     npcs.push({ type: 'npc', name: 'Странник Эльдар', x: 34, y: 7, dialog: 'Я ищу древний артефакт... Не поможешь?', hp: 18, maxHp: 18 });
     npcs.push({ type: 'npc', name: 'Лесничий Бран', x: 30, y: 2, dialog: 'В лесу волки — будьте осторожны.', hp: 20, maxHp: 20 });
@@ -197,7 +195,7 @@ export function generateFallbackWorld(assets: string[], settings: any): any {
     for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) {
       const edge = x === 0 || y === 0 || x === size - 1 || y === size - 1;
       const innerW = (y === 10 && x < 32) || (y === 20 && x > 8 && x < 38) || (y === 30 && x < 30) || (x === 10 && y > 10 && y < 30) || (x === 28 && y > 20 && y < 38) || (x === 18 && y > 10 && y < 20);
-      map[y][x] = (edge || innerW) ? W : F;
+      map[y]![x] = (edge || innerW) ? W : F;
     }
     if (light) for (let i = 0; i < 10; i++) { objects.push({ id: light, x: 3 + i * 4, y: 1 }); objects.push({ id: light, x: 1, y: 11 + i * 3 }); }
     if (light) objects.push({ id: light, x: 38, y: 25 });
@@ -215,7 +213,7 @@ export function generateFallbackWorld(assets: string[], settings: any): any {
     for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) {
       const outer = x === 0 || y === 0 || x === size - 1 || y === size - 1;
       const inner = (y === 7 && x < 35) || (y === 30 && x > 5) || (x === 10 && y > 7 && y < 30) || (x === 30 && y > 7 && y < 30) || (x === 20 && y > 15 && y < 22);
-      map[y][x] = (outer || inner) ? W : F;
+      map[y]![x] = (outer || inner) ? W : F;
     }
     if (light) for (let i = 0; i < 10; i++) { objects.push({ id: light, x: 2, y: 3 + i * 4 }); objects.push({ id: light, x: 38, y: 3 + i * 4 }); }
     if (table) { objects.push({ id: table, x: 19, y: 18 }); objects.push({ id: table, x: 21, y: 18 }); }
@@ -229,10 +227,10 @@ export function generateFallbackWorld(assets: string[], settings: any): any {
   }
 
   // mountains
-  if (darkStone) for (let i = 0; i < 30; i++) { const sx = 5 + Math.floor(rnd(i * 5) * 30); const sy = 5 + Math.floor(rnd(i * 6) * 30); map[sy][sx] = darkStone; }
-  if (path) for (let i = 0; i < 20; i++) map[15 + i][20] = path;
-  if (floorCave) for (let dy = 0; dy < 5; dy++) for (let dx = 0; dx < 6; dx++) map[30 + dy][5 + dx] = floorCave;
-  if (wallStone) { for (let dy = 0; dy < 5; dy++) { map[30 + dy][4] = wallStone; map[30 + dy][11] = wallStone; } for (let dx = 0; dx < 8; dx++) { map[29][5 + dx] = wallStone; map[35][5 + dx] = wallStone; } }
+  if (darkStone) for (let i = 0; i < 30; i++) { const sx = 5 + Math.floor(rnd(i * 5) * 30); const sy = 5 + Math.floor(rnd(i * 6) * 30); map[sy]![sx] = darkStone; }
+  if (path) for (let i = 0; i < 20; i++) map[15 + i]![20] = path;
+  if (floorCave) for (let dy = 0; dy < 5; dy++) for (let dx = 0; dx < 6; dx++) map[30 + dy]![5 + dx] = floorCave;
+  if (wallStone) { for (let dy = 0; dy < 5; dy++) { map[30 + dy]![4] = wallStone; map[30 + dy]![11] = wallStone; } for (let dx = 0; dx < 8; dx++) { map[29]![5 + dx] = wallStone; map[35]![5 + dx] = wallStone; } }
   if (tree) for (let i = 0; i < 10; i++) objects.push({ id: tree, x: 30 + Math.floor(rnd(i * 1) * 8), y: 2 + Math.floor(rnd(i * 2) * 10) });
   if (light) { objects.push({ id: light, x: 20, y: 15 }); objects.push({ id: light, x: 7, y: 32 }); objects.push({ id: light, x: 8, y: 32 }); }
   if (chest) objects.push({ id: chest, x: 8, y: 33 });

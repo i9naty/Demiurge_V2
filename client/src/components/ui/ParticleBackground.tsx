@@ -57,14 +57,14 @@ export function ParticleBackground() {
       ctx!.clearRect(0, 0, w, h);
 
       for (let i = particles.length - 1; i >= 0; i--) {
-        const p = particles[i];
+        const p = particles[i]!;
         p.x += p.vx;
         p.y += p.vy;
         p.life++;
 
         if (p.life > p.maxLife || p.y < -20 || p.y > h + 20) {
           particles[i] = createParticle();
-          particles[i].y = h + 10;
+          particles[i]!.y = h + 10;
         }
 
         const alpha = p.opacity * (1 - p.life / p.maxLife);
@@ -75,7 +75,7 @@ export function ParticleBackground() {
 
         // Соединяем близкие частицы линиями
         for (let j = i + 1; j < particles.length; j++) {
-          const q = particles[j];
+          const q = particles[j]!;
           const dx = p.x - q.x;
           const dy = p.y - q.y;
           const dist = Math.sqrt(dx * dx + dy * dy);

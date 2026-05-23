@@ -2,7 +2,6 @@ import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useStore } from '../../store';
 import { User, Search, Send, X, MessageCircle, ChevronRight } from 'lucide-react';
-import { useLocation } from 'react-router-dom';
 
 interface Conversation {
   id: string;
@@ -25,7 +24,6 @@ interface DMMessage {
 
 export function DMPanel() {
   const { user, token, socket } = useStore();
-  const location = useLocation();
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [activeChat, setActiveChat] = useState<Conversation | null>(null);
   const [messages, setMessages] = useState<DMMessage[]>([]);
@@ -68,8 +66,6 @@ export function DMPanel() {
     socket.on('dm:message', handler);
     return () => { socket.off('dm:message', handler); };
   }, [socket, token, user?.id]);
-
-  const isOnTavern = location.pathname === '/discord';
 
   const sendMessage = () => {
     if (!input.trim() || !activeChat || !socket) return;
