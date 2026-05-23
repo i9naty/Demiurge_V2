@@ -22,6 +22,7 @@ import { sessionsRouter } from './routes/sessions';
 import { discordRouter } from './routes/discord';
 import { storyRouter } from './routes/story';
 import { gameRouter } from './routes/game';
+import { compendiumRouter, seedCompendium } from './routes/compendium';
 import { setupSocket } from './socket';
 import { errorHandler, requestIdMiddleware, notFoundHandler } from './middleware/errorHandler';
 
@@ -101,6 +102,7 @@ app.use('/api/sessions', apiLimiter, sessionsRouter);
 app.use('/api/discord', apiLimiter, discordRouter);
 app.use('/api/story', apiLimiter, storyRouter);
 app.use('/api/game', apiLimiter, gameRouter);
+app.use('/api/compendium', apiLimiter, compendiumRouter);
 
 // Здоровье сервера
 app.get('/api/health', async (_req, res) => {
@@ -209,6 +211,7 @@ async function start() {
   await testConnection();
   await runMigrations();
   await seedAchievements();
+  await seedCompendium();
   scanAssets(path.resolve(__dirname, '../../client/public/assets'));
 
   httpServer.listen(env.PORT, () => {

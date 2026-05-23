@@ -628,8 +628,8 @@ export function RoomPage() {
         )}
 
         {compOpen && (
-          <Compendium onSummon={(m) => {
-            socket?.emit('token:create', { roomId, name: m.name, x: Math.floor(Math.random() * 20), y: Math.floor(Math.random() * 20), width: m.size === 'large' ? 140 : m.size === 'huge' ? 210 : 70, height: m.size === 'large' ? 140 : m.size === 'huge' ? 210 : 70 });
+          <Compendium onDragToken={(data) => {
+            socket?.emit('token:create', { roomId, name: data.name, x: data.x, y: data.y, width: data.width, height: data.height });
           }} />
         )}
       </div>

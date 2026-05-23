@@ -652,3 +652,58 @@ CREATE INDEX IF NOT EXISTS idx_player_inventory_user_room ON player_inventory(us
 CREATE INDEX IF NOT EXISTS idx_quests_room_status ON quests(room_id, status);
 CREATE INDEX IF NOT EXISTS idx_trade_offers_room_status ON trade_offers(room_id, status);
 CREATE INDEX IF NOT EXISTS idx_messages_room_created ON messages(room_id, created_at);
+
+-- ============================================================
+-- COMPENDIUM (монстры, заклинания, предметы)
+-- ============================================================
+CREATE TABLE IF NOT EXISTS compendium_monsters (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name VARCHAR(128) NOT NULL,
+  cr VARCHAR(8) NOT NULL DEFAULT '0',
+  type VARCHAR(64) NOT NULL DEFAULT 'humanoid',
+  size VARCHAR(32) NOT NULL DEFAULT 'medium',
+  alignment VARCHAR(32) DEFAULT 'neutral',
+  ac INT NOT NULL DEFAULT 10,
+  hp INT NOT NULL DEFAULT 10,
+  speed VARCHAR(64) DEFAULT '30 ft.',
+  stats JSONB DEFAULT '{}',
+  actions TEXT,
+  traits TEXT,
+  source VARCHAR(64) DEFAULT 'SRD',
+  image_url VARCHAR(512),
+  tags TEXT[] DEFAULT '{}'
+);
+
+CREATE TABLE IF NOT EXISTS compendium_spells (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name VARCHAR(128) NOT NULL,
+  level INT NOT NULL DEFAULT 0,
+  school VARCHAR(32) NOT NULL DEFAULT 'evocation',
+  casting_time VARCHAR(64) DEFAULT '1 action',
+  range VARCHAR(64) DEFAULT '60 ft.',
+  components VARCHAR(32) DEFAULT 'V,S',
+  duration VARCHAR(64) DEFAULT 'Instantaneous',
+  description TEXT NOT NULL DEFAULT '',
+  higher_level TEXT,
+  classes TEXT[] DEFAULT '{}',
+  source VARCHAR(64) DEFAULT 'SRD'
+);
+
+CREATE TABLE IF NOT EXISTS compendium_items (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name VARCHAR(128) NOT NULL,
+  type VARCHAR(32) NOT NULL DEFAULT 'adventuring_gear',
+  rarity VARCHAR(32) DEFAULT 'common',
+  cost VARCHAR(32) DEFAULT '0 gp',
+  weight FLOAT DEFAULT 0,
+  description TEXT DEFAULT '',
+  properties JSONB DEFAULT '{}',
+  source VARCHAR(64) DEFAULT 'SRD',
+  image_url VARCHAR(512)
+);
+
+CREATE INDEX IF NOT EXISTS idx_compendium_monsters_cr ON compendium_monsters(cr);
+CREATE INDEX IF NOT EXISTS idx_compendium_monsters_type ON compendium_monsters(type);
+CREATE INDEX IF NOT EXISTS idx_compendium_spells_level ON compendium_spells(level);
+CREATE INDEX IF NOT EXISTS idx_compendium_spells_school ON compendium_spells(school);
+CREATE INDEX IF NOT EXISTS idx_compendium_items_type ON compendium_items(type);
