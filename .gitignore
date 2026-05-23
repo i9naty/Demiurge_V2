@@ -43,6 +43,10 @@ uploads/
 coverage/
 .nyc_output/
 
+# Backup files
+*.bak
+*~
+
 # Temp
 tmp/
 .tmp/
