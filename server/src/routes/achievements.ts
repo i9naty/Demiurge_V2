@@ -28,7 +28,9 @@ export async function seedAchievements() {
          VALUES ($1,$2,$3,$4,$5,$6,$7) ON CONFLICT (id) DO UPDATE SET name=$2, description=$3, icon=$4`,
         [a.id, a.name, a.description, a.icon, a.category, a.condition_type, a.condition_value]
       );
-    } catch {}
+        } catch (err) {
+          console.error('Insert user achievement error:', err instanceof Error ? err.message : err);
+        }
   }
 }
 
@@ -49,7 +51,7 @@ achievementsRouter.get('/', authMiddleware, async (req: Request, res: Response) 
     res.json({ achievements: result.rows, stats: stats.rows[0] || {} });
   } catch (err: any) {
     console.error('Achievements error:', err.message);
-    res.json({ achievements: [], stats: {} });
+    res.status(500).json({ success: false, error: { code: 'SERVER_ERROR', message: 'Ошибка загрузки достижений' } });
   }
 });
 
@@ -91,7 +93,9 @@ export async function checkAchievements(userId: string) {
             [userId, a.id]
           );
           newlyEarned.push(a.name);
-        } catch {}
+    } catch (err) {
+      console.error('Seed achievement error:', err instanceof Error ? err.message : err);
+    }
       }
     }
 

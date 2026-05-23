@@ -86,7 +86,9 @@ export async function generateWorld(params: {
       playerStart: json.player_start || { x: 20, y: 20 },
       timeOfDay: (params.setting === 'dungeon' || params.setting === 'castle') ? 'night' : 'day',
     };
-  } catch {}
+  } catch (err) {
+    console.error('generateWorld AI error:', err instanceof Error ? err.message : err);
+  }
 
   return null;
 }
@@ -136,7 +138,9 @@ ${h || '(начало игры)'}
       ...json,
       description: json.narration || json.description,
     };
-  } catch {}
+  } catch (err) {
+    console.error('generateWorld AI error:', err instanceof Error ? err.message : err);
+  }
 
   return null;
 }

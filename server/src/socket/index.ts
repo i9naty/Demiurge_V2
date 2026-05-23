@@ -107,7 +107,7 @@ export function setupSocket(io: Server) {
         }
       }
       const msgId = uuid();
-      try { await query('INSERT INTO messages (id, room_id, user_id, content, type, metadata) VALUES ($1,$2,$3,$4,$5,$6)', [msgId, roomId, userId, processedContent, messageType, metadata ? JSON.stringify(metadata) : '{}']); } catch {}
+      try { await query('INSERT INTO messages (id, room_id, user_id, content, type, metadata) VALUES ($1,$2,$3,$4,$5,$6)', [msgId, roomId, userId, processedContent, messageType, metadata ? JSON.stringify(metadata) : '{}']); } catch (err) { console.error('Save chat message error:', err instanceof Error ? err.message : err); }
       io.to(roomId).emit('chat:message', { id: msgId, roomId, userId, username, content: processedContent, type: messageType, metadata, createdAt: new Date().toISOString() });
 
       // Handle whisper: /w @username message
@@ -132,17 +132,17 @@ export function setupSocket(io: Server) {
       const w = Math.min(data.width || 64, 500);
       const h = Math.min(data.height || 64, 500);
       const tokenId = uuid();
-      try { await query('INSERT INTO tokens (id, room_id, name, image_url, x, y, width, height, created_by) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)', [tokenId, data.roomId, data.name, data.imageUrl || null, data.x, data.y, w, h, userId]); } catch {}
+      try { await query('INSERT INTO tokens (id, room_id, name, image_url, x, y, width, height, created_by) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)', [tokenId, data.roomId, data.name, data.imageUrl || null, data.x, data.y, w, h, userId]); } catch (err) { console.error('Save token error:', err instanceof Error ? err.message : err); }
       io.to(data.roomId).emit('token:created', { id: tokenId, roomId: data.roomId, name: data.name, imageUrl: data.imageUrl || null, x: data.x, y: data.y, width: w, height: h, createdBy: userId });
     });
     socket.on('token:move', (data: { roomId: string; tokenId: string; x: number; y: number }) => {
       if (!requireAuth(socket)) return;
-      try { query('UPDATE tokens SET x = $1, y = $2 WHERE id = $3', [data.x, data.y, data.tokenId]); } catch {}
+      try { query('UPDATE tokens SET x = $1, y = $2 WHERE id = $3', [data.x, data.y, data.tokenId]); } catch (err) { console.error('Save token move error:', err instanceof Error ? err.message : err); }
       io.to(data.roomId).emit('token:moved', { tokenId: data.tokenId, x: data.x, y: data.y, movedBy: userId });
     });
     socket.on('token:delete', async (data: { roomId: string; tokenId: string }) => {
       if (!requireAuth(socket)) return;
-      try { await query('DELETE FROM tokens WHERE id = $1', [data.tokenId]); } catch {}
+      try { await query('DELETE FROM tokens WHERE id = $1', [data.tokenId]); } catch (err) { console.error('Delete token error:', err instanceof Error ? err.message : err); }
       io.to(data.roomId).emit('token:deleted', { tokenId: data.tokenId });
     });
     socket.on('fog:update', (data: { roomId: string; fogData: any }) => {
@@ -168,11 +168,11 @@ export function setupSocket(io: Server) {
         if (existing.rows.length > 0) await query('UPDATE player_inventory SET quantity = quantity + 1 WHERE id = $1', [existing.rows[0].id]);
         else await query('INSERT INTO player_inventory (user_id, room_id, item_type, quantity, slot) SELECT $1,$2,$3,1,COALESCE(MAX(slot),-1)+1 FROM player_inventory WHERE user_id=$1 AND room_id=$2', [userId, data.roomId, t.resource_type]);
         io.to(data.roomId).emit('world:resource_gathered', { userId, username, tileX: data.tileX, tileY: data.tileY, resourceType: t.resource_type });
-      } catch {}
+      } catch (err) { console.error('World gather error:', err instanceof Error ? err.message : err); }
     });
     socket.on('world:request_events', async (data: { roomId: string }) => {
       if (!requireAuth(socket)) return;
-      try { const events = await generateWorldEvents(data.roomId); if (events) io.to(data.roomId).emit('world:event', events); } catch {}
+      try { const events = await generateWorldEvents(data.roomId); if (events) io.to(data.roomId).emit('world:event', events); } catch (err) { console.error('World events error:', err instanceof Error ? err.message : err); }
     });
 
     // ─── AI ПОМОЩНИК ───
@@ -186,7 +186,7 @@ export function setupSocket(io: Server) {
     socket.on('dm:send', async (data: { to: string; content: string }) => {
       if (!data.content?.trim()) return;
       const msgId = uuid();
-      try { await query('INSERT INTO direct_messages (id, sender_id, receiver_id, content) VALUES ($1,$2,$3,$4)', [msgId, userId, data.to, data.content]); } catch {}
+      try { await query('INSERT INTO direct_messages (id, sender_id, receiver_id, content) VALUES ($1,$2,$3,$4)', [msgId, userId, data.to, data.content]); } catch (err) { console.error('DM insert error:', err instanceof Error ? err.message : err); }
       const payload = { id: msgId, sender_id: userId, sender_name: username, receiver_id: data.to, content: data.content, created_at: new Date().toISOString() };
       socket.emit('dm:message', payload);
       (await io.fetchSockets()).forEach(s => { if (connectedUsers.get(s.id)?.userId === data.to) s.emit('dm:message', payload); });
@@ -202,7 +202,7 @@ export function setupSocket(io: Server) {
     socket.on('discord:message', async (data: { channelId: string; content: string }) => {
       if (!data.content?.trim()) return;
       const msgId = uuid();
-      try { await query('INSERT INTO discord_messages (id, channel_id, user_id, content) VALUES ($1,$2,$3,$4)', [msgId, data.channelId, userId, data.content]); } catch {}
+      try { await query('INSERT INTO discord_messages (id, channel_id, user_id, content) VALUES ($1,$2,$3,$4)', [msgId, data.channelId, userId, data.content]); } catch (err) { console.error('Discord message error:', err instanceof Error ? err.message : err); }
       io.to(`dch:${data.channelId}`).emit('discord:message', { id: msgId, channel_id: data.channelId, user_id: userId, username, content: data.content, created_at: new Date().toISOString() });
     });
 
@@ -246,7 +246,7 @@ export function setupSocket(io: Server) {
       const user = connectedUsers.get(socket.id); if (user) user.sessionId = sessionId;
       try {
         await query('UPDATE lobby_participants SET is_online = true WHERE session_id = $1 AND user_id = $2', [sessionId, userId]);
-      } catch {}
+      } catch (err) { console.error('Lobby join error:', err instanceof Error ? err.message : err); }
       const participants = await query(
         'SELECT lp.*, u.username, u.avatar_url FROM lobby_participants lp JOIN users u ON lp.user_id = u.id WHERE lp.session_id = $1',
         [sessionId]
@@ -259,7 +259,7 @@ export function setupSocket(io: Server) {
       const user = connectedUsers.get(socket.id); if (user) user.sessionId = null;
       try {
         await query('UPDATE lobby_participants SET is_online = false WHERE session_id = $1 AND user_id = $2', [sessionId, userId]);
-      } catch {}
+      } catch (err) { console.error('Lobby leave error:', err instanceof Error ? err.message : err); }
       const participants = await query(
         'SELECT lp.*, u.username, u.avatar_url FROM lobby_participants lp JOIN users u ON lp.user_id = u.id WHERE lp.session_id = $1',
         [sessionId]
@@ -272,13 +272,13 @@ export function setupSocket(io: Server) {
         try {
           await query('UPDATE lobby_participants SET character_data = $1 WHERE session_id = $2 AND user_id = $3',
             [JSON.stringify(data.characterData), data.sessionId, userId]);
-        } catch {}
+        } catch (err) { console.error('Lobby update character error:', err instanceof Error ? err.message : err); }
       }
       if (data.role) {
         try {
           await query('UPDATE lobby_participants SET role = $1 WHERE session_id = $2 AND user_id = $3',
             [data.role, data.sessionId, userId]);
-        } catch {}
+        } catch (err) { console.error('Lobby update role error:', err instanceof Error ? err.message : err); }
       }
       const participants = await query(
         'SELECT lp.*, u.username, u.avatar_url FROM lobby_participants lp JOIN users u ON lp.user_id = u.id WHERE lp.session_id = $1',
@@ -396,7 +396,7 @@ export function setupSocket(io: Server) {
       try {
         const pRes = await query('SELECT character_data FROM lobby_participants WHERE session_id = $1 AND user_id = $2', [data.sessionId, userId]);
         if (pRes.rows.length > 0) playerPrompt = (pRes.rows[0].character_data || {}).prompt || '';
-      } catch {}
+      } catch (err) { console.error('Game action character data error:', err instanceof Error ? err.message : err); }
 
       // Try AI first
       let response: any = null;
@@ -418,7 +418,7 @@ export function setupSocket(io: Server) {
           playerMaxHp,
           inventory: [],
         });
-      } catch {}
+      } catch (err) { console.error('Game action error:', err instanceof Error ? err.message : err); }
 
       if (!response || !response.description) {
         response = smartFallback({ action: data.action, curTokens, curObjects, ws, userId });
@@ -458,7 +458,7 @@ export function setupSocket(io: Server) {
       try {
         await query('UPDATE game_sessions SET world_state=$1, story_state=$2, updated_at=NOW() WHERE id=$3',
           [JSON.stringify(newWs), JSON.stringify(newSs), data.sessionId]);
-      } catch {}
+      } catch (err) { console.error('Save game error:', err instanceof Error ? err.message : err); }
 
       io.to(`game:${data.sessionId}`).emit('game:state', {
         description: response.description, options: response.options,
@@ -538,7 +538,7 @@ export function setupSocket(io: Server) {
             [user.sessionId]
           );
           io.to(`game:${user.sessionId}`).emit('lobby:participants', participants.rows);
-        } catch {}
+        } catch (err) { console.error('Disconnect cleanup error:', err instanceof Error ? err.message : err); }
       }
       connectedUsers.delete(socket.id);
     });

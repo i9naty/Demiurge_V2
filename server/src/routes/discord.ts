@@ -204,7 +204,7 @@ discordRouter.get('/messages/:messageId/reactions', authMiddleware, async (req: 
   try {
     const result = await query('SELECT emoji, COUNT(*) as cnt FROM discord_reactions WHERE message_id = $1 GROUP BY emoji', [(req.params.messageId as string)]);
     res.json(result.rows);
-  } catch (err: any) { console.error('Get reactions error:', err.message); res.json([]); }
+  } catch (err: any) { console.error('Get reactions error:', err.message); res.status(500).json({ success: false, error: { code: 'SERVER_ERROR', message: 'Ошибка загрузки реакций' } }); }
 });
 
 // Create category
@@ -225,7 +225,7 @@ discordRouter.get('/servers/:serverId/roles', authMiddleware, async (req: Reques
   try {
     const result = await query('SELECT * FROM discord_roles WHERE server_id = $1 ORDER BY position', [(req.params.serverId as string)]);
     res.json(result.rows);
-  } catch (err: any) { console.error('Roles error:', err.message); res.json([]); }
+  } catch (err: any) { console.error('Roles error:', err.message); res.status(500).json({ success: false, error: { code: 'SERVER_ERROR', message: 'Ошибка загрузки ролей' } }); }
 });
 
 // Create role

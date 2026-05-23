@@ -142,7 +142,7 @@ storyRouter.get('/public', async (_req: Request, res: Response) => {
        WHERE ss.status IN ('active', 'lobby') ORDER BY ss.created_at DESC LIMIT 10`
     );
     res.json(result.rows);
-  } catch { res.json([]); }
+  } catch (err) { console.error('Public stories error:', err instanceof Error ? err.message : err); res.status(500).json({ success: false, error: { code: 'SERVER_ERROR', message: 'Ошибка загрузки историй' } }); }
 });
 
 storyRouter.post('/:id/end', authMiddleware, async (req: Request, res: Response) => {

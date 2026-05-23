@@ -73,7 +73,7 @@ worldRouter.post('/:roomId/generate', authMiddleware, async (req: Request, res: 
     res.json({ success: true, stats: { tiles: worldData.tiles?.length || 0, buildings: worldData.buildings?.length || 0, npcs: worldData.npcs?.length || 0, factions: worldData.factions?.length || 0, quests: worldData.quests?.length || 0 } });
   } catch (err: any) {
     console.error('World generation error:', err.message);
-    res.status(500).json({ error: 'Ошибка генерации мира: ' + err.message });
+    res.status(500).json({ success: false, error: { code: 'GENERATION_ERROR', message: 'Ошибка генерации мира' } });
   }
 });
 

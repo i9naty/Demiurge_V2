@@ -129,7 +129,7 @@ gameRouter.get('/public', async (_req: Request, res: Response) => {
        ORDER BY gs.updated_at DESC LIMIT 20`
     );
     res.json(result.rows);
-  } catch { res.json([]); }
+  } catch (err) { console.error('Public games error:', err instanceof Error ? err.message : err); res.status(500).json({ success: false, error: { code: 'SERVER_ERROR', message: 'Ошибка загрузки игр' } }); }
 });
 
 // Save game
@@ -187,5 +187,5 @@ gameRouter.get('/saves', authMiddleware, async (req: Request, res: Response) => 
       [req.user!.userId]
     );
     res.json(result.rows);
-  } catch { res.json([]); }
+  } catch (err) { console.error('Public games error:', err instanceof Error ? err.message : err); res.status(500).json({ success: false, error: { code: 'SERVER_ERROR', message: 'Ошибка загрузки игр' } }); }
 });

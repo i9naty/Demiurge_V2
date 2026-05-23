@@ -87,7 +87,7 @@ sessionsRouter.post('/', authMiddleware, async (req: Request, res: Response) => 
     const result = await query('SELECT * FROM sessions_planned WHERE id = $1', [id]);
     res.status(201).json(result.rows[0]);
   } catch (err: any) {
-    await client.query('ROLLBACK').catch(() => {});
+    await client.query('ROLLBACK').catch((rollbackErr) => { console.error('Rollback error:', rollbackErr instanceof Error ? rollbackErr.message : rollbackErr); });
     console.error('Session create error:', err.message);
     res.status(500).json({ error: 'Ошибка создания сессии' });
   } finally {

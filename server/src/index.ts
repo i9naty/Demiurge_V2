@@ -23,6 +23,7 @@ import { discordRouter } from './routes/discord';
 import { storyRouter } from './routes/story';
 import { gameRouter } from './routes/game';
 import { setupSocket } from './socket';
+import { errorHandler, requestIdMiddleware, notFoundHandler } from './middleware/errorHandler';
 
 const isDev = env.NODE_ENV === 'development';
 const app = express();
@@ -76,6 +77,7 @@ const authLimiter = rateLimit({
 });
 
 app.use(morgan(isDev ? 'dev' : 'combined'));
+app.use(requestIdMiddleware);
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
@@ -136,10 +138,16 @@ app.get('/api/assets', (_req, res) => {
   res.json(getAssetIndex());
 });
 
+// 404 для несуществующих API маршрутов
+app.use('/api/*', notFoundHandler);
+
 // SPA fallback — всё что не API, отдаём index.html
 app.get('*', (_req, res) => {
   res.sendFile(path.resolve(clientDist, 'index.html'));
 });
+
+// Глобальный обработчик ошибок
+app.use(errorHandler);
 
 // Сокеты
 setupSocket(io);
