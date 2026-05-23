@@ -10,6 +10,12 @@ async function requireParticipant(userId: string, roomId: string): Promise<boole
   return r.rows.length > 0;
 }
 
+function chunkArray<T>(arr: T[], size: number): T[][] {
+  const chunks: T[][] = [];
+  for (let i = 0; i < arr.length; i += size) chunks.push(arr.slice(i, i + size));
+  return chunks;
+}
+
 // Сгенерировать мир через AI
 worldRouter.post('/:roomId/generate', authMiddleware, async (req: Request, res: Response) => {
   try {
@@ -20,56 +26,101 @@ worldRouter.post('/:roomId/generate', authMiddleware, async (req: Request, res: 
     const ws = await query('SELECT * FROM world_states WHERE room_id = $1', [(req.params.roomId as string)]);
     if (ws.rows.length === 0) { res.status(404).json({ error: 'Мир не найден' }); return; }
     const seed = ws.rows[0].seed;
-    const worldData = await generateWorld({ seed, width: Math.min(width, 80), height: Math.min(height, 80), biome, density, difficulty, prompt });
+    const w = Math.min(width, 80), h = Math.min(height, 80);
+    const worldData = await generateWorld({ seed, width: w, height: h, biome, density, difficulty, prompt });
+    const roomId = req.params.roomId as string;
+    const BATCH_SIZE = 500;
 
-    // Save tiles
-    if (worldData.tiles) {
-      for (const t of worldData.tiles) {
+    // Save tiles — batch insert via unnest
+    if (worldData.tiles && worldData.tiles.length > 0) {
+      const chunks = chunkArray(worldData.tiles, BATCH_SIZE);
+      for (const chunk of chunks) {
+        const xs = chunk.map((t: any) => t.x);
+        const ys = chunk.map((t: any) => t.y);
+        const terrains = chunk.map((t: any) => t.terrain);
+        const elevs = chunk.map((t: any) => t.elevation || 0);
+        const rtypes = chunk.map((t: any) => t.resource_type || null);
+        const ramounts = chunk.map((t: any) => t.resource_amount || 0);
         await query(
           `INSERT INTO world_tiles (room_id, x, y, terrain, elevation, resource_type, resource_amount)
-           VALUES ($1,$2,$3,$4,$5,$6,$7) ON CONFLICT (room_id, x, y) DO UPDATE
-           SET terrain=$4, elevation=$5, resource_type=$6, resource_amount=$7`,
-          [(req.params.roomId as string), t.x, t.y, t.terrain, t.elevation || 0, t.resource_type, t.resource_amount || 0]
+           SELECT $1::uuid, t.x, t.y, t.terrain, t.elevation, t.resource_type, t.resource_amount
+           FROM unnest($2::int[], $3::int[], $4::text[], $5::float[], $6::text[], $7::int[])
+           AS t(x, y, terrain, elevation, resource_type, resource_amount)
+           ON CONFLICT (room_id, x, y) DO UPDATE SET
+             terrain=EXCLUDED.terrain, elevation=EXCLUDED.elevation,
+             resource_type=EXCLUDED.resource_type, resource_amount=EXCLUDED.resource_amount`,
+          [roomId, xs, ys, terrains, elevs, rtypes, ramounts]
         );
       }
     }
-    // Save buildings
-    if (worldData.buildings) {
-      for (const b of worldData.buildings) {
+
+    // Save buildings — batch VALUES
+    if (worldData.buildings && worldData.buildings.length > 0) {
+      const chunks = chunkArray(worldData.buildings, BATCH_SIZE);
+      for (const chunk of chunks) {
+        const values: string[] = [];
+        const params: unknown[] = [roomId];
+        chunk.forEach((b: any, _i: number) => {
+          const base = params.length;
+          params.push(b.tile_x, b.tile_y, b.building_type, b.name);
+          values.push(`($1, $${base}, $${base + 1}, $${base + 2}, $${base + 3})`);
+        });
         await query(
-          `INSERT INTO buildings (room_id, tile_x, tile_y, building_type, name) VALUES ($1,$2,$3,$4,$5) ON CONFLICT (room_id, tile_x, tile_y) DO NOTHING`,
-          [(req.params.roomId as string), b.tile_x, b.tile_y, b.building_type, b.name]
+          `INSERT INTO buildings (room_id, tile_x, tile_y, building_type, name) VALUES ${values.join(',')} ON CONFLICT (room_id, tile_x, tile_y) DO NOTHING`,
+          params
         );
       }
     }
-    // Save NPCs
-    if (worldData.npcs) {
-      for (const n of worldData.npcs) {
+
+    // Save NPCs — batch VALUES
+    if (worldData.npcs && worldData.npcs.length > 0) {
+      const chunks = chunkArray(worldData.npcs, BATCH_SIZE);
+      for (const chunk of chunks) {
+        const values: string[] = [];
+        const params: unknown[] = [roomId];
+        chunk.forEach((n: any, _i: number) => {
+          const base = params.length;
+          params.push(n.name, n.personality || 'нейтральный', n.type || 'крестьянин', n.x, n.y, n.is_unique || false);
+          values.push(`($1, $${base}, $${base + 1}, $${base + 2}, $${base + 3}, $${base + 4}, $${base + 5})`);
+        });
         await query(
-          `INSERT INTO npcs (room_id, name, personality, type, x, y, is_unique) VALUES ($1,$2,$3,$4,$5,$6,$7)`,
-          [(req.params.roomId as string), n.name, n.personality || 'нейтральный', n.type || 'крестьянин', n.x, n.y, n.is_unique || false]
+          `INSERT INTO npcs (room_id, name, personality, type, x, y, is_unique) VALUES ${values.join(',')}`,
+          params
         );
       }
     }
-    // Save factions
-    if (worldData.factions) {
-      for (const f of worldData.factions) {
-        await query(
-          `INSERT INTO factions (room_id, name, reputation, color, wealth) VALUES ($1,$2,$3,$4,$5) ON CONFLICT (room_id, name) DO NOTHING`,
-          [(req.params.roomId as string), f.name, f.reputation || 50, f.color || '#3b82f6', f.wealth || 1000]
-        );
-      }
+
+    // Save factions — batch VALUES
+    if (worldData.factions && worldData.factions.length > 0) {
+      const values: string[] = [];
+      const params: unknown[] = [roomId];
+      worldData.factions.forEach((f: any, _i: number) => {
+        const base = params.length;
+        params.push(f.name, f.reputation || 50, f.color || '#3b82f6', f.wealth || 1000);
+        values.push(`($1, $${base}, $${base + 1}, $${base + 2}, $${base + 3})`);
+      });
+      await query(
+        `INSERT INTO factions (room_id, name, reputation, color, wealth) VALUES ${values.join(',')} ON CONFLICT (room_id, name) DO NOTHING`,
+        params
+      );
     }
-    // Save quests
-    if (worldData.quests) {
-      for (const q of worldData.quests) {
-        await query(
-          `INSERT INTO quests (room_id, title, description, objective_type, reward) VALUES ($1,$2,$3,$4,$5)`,
-          [(req.params.roomId as string), q.title, q.description || '', q.objectiveType || 'explore', JSON.stringify(q.reward || {})]
-        );
-      }
+
+    // Save quests — batch VALUES
+    if (worldData.quests && worldData.quests.length > 0) {
+      const values: string[] = [];
+      const params: unknown[] = [roomId];
+      worldData.quests.forEach((q: any, _i: number) => {
+        const base = params.length;
+        params.push(q.title, q.description || '', q.objectiveType || 'explore', JSON.stringify(q.reward || {}));
+        values.push(`($1, $${base}, $${base + 1}, $${base + 2}, $${base + 3})`);
+      });
+      await query(
+        `INSERT INTO quests (room_id, title, description, objective_type, reward) VALUES ${values.join(',')}`,
+        params
+      );
     }
-    await query('UPDATE world_states SET width=$1, height=$2 WHERE room_id=$3', [width, height, (req.params.roomId as string)]);
+
+    await query('UPDATE world_states SET width=$1, height=$2 WHERE room_id=$3', [w, h, roomId]);
     res.json({ success: true, stats: { tiles: worldData.tiles?.length || 0, buildings: worldData.buildings?.length || 0, npcs: worldData.npcs?.length || 0, factions: worldData.factions?.length || 0, quests: worldData.quests?.length || 0 } });
   } catch (err: any) {
     console.error('World generation error:', err.message);
