@@ -15,6 +15,20 @@ interface User {
   isGuest?: boolean;
 }
 
+async function apiPost(path: string, body?: unknown) {
+  const res = await fetch(`${API}${path}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  const json = await res.json();
+  if (!res.ok || !json.success) {
+    const msg = json.error?.message || 'Ошибка запроса';
+    throw new Error(msg);
+  }
+  return json.data;
+}
+
 interface AuthState {
   user: User | null;
   token: string | null;
@@ -38,18 +52,7 @@ export const useStore = create<AuthState>((set, get) => ({
   login: async (username, password) => {
     set({ isLoading: true });
     try {
-      const res = await fetch(`${API}/auth/login`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, password }),
-      });
-
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.error || 'Ошибка входа');
-      }
-
-      const data = await res.json();
+      const data = await apiPost('/auth/login', { username, password });
       localStorage.setItem('demiurge_token', data.token);
       localStorage.setItem('demiurge_refresh', data.refreshToken);
       set({ user: data.user, token: data.token, isLoading: false });
@@ -63,18 +66,7 @@ export const useStore = create<AuthState>((set, get) => ({
   register: async (username, email, password) => {
     set({ isLoading: true });
     try {
-      const res = await fetch(`${API}/auth/register`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, email, password }),
-      });
-
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.error || 'Ошибка регистрации');
-      }
-
-      const data = await res.json();
+      const data = await apiPost('/auth/register', { username, email, password });
       localStorage.setItem('demiurge_token', data.token);
       localStorage.setItem('demiurge_refresh', data.refreshToken);
       set({ user: data.user, token: data.token, isLoading: false });
@@ -88,10 +80,7 @@ export const useStore = create<AuthState>((set, get) => ({
   guestLogin: async () => {
     set({ isLoading: true });
     try {
-      const res = await fetch(`${API}/auth/guest`, { method: 'POST' });
-      if (!res.ok) throw new Error('Ошибка гостевого входа');
-
-      const data = await res.json();
+      const data = await apiPost('/auth/guest');
       localStorage.setItem('demiurge_token', data.token);
       localStorage.setItem('demiurge_refresh', data.refreshToken);
       set({ user: data.user, token: data.token, isLoading: false });
