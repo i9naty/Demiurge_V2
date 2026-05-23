@@ -71,7 +71,7 @@ export function IsometricMap({ buildings, npcs, playerPos, buildingMode, onTileC
         const ty = Math.round(pd.y) - Math.floor(R / 2) + y;
         const key = `${tx},${ty}`;
         let tile = tileCache.current.get(key);
-        if (!tile) { tile = getTile(tx, ty, seed, biome, density); tileCache.current.set(key, tile); }
+        if (!tile) { tile = getTile(tx, ty, seed, biome, density); tileCache.current.set(key, tile); if (tileCache.current.size > 500) { const first = tileCache.current.keys().next().value; if (first) tileCache.current.delete(first); } }
         const building = bm.get(key);
         const npcsHere = nm.get(key);
         const pos = iso(tx, ty, tile.elevation);

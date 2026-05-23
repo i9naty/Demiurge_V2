@@ -466,11 +466,25 @@ export function VTTCanvas(p: Props) {
   useEffect(() => { const rs = () => { const c = canvasRef.current; if (!c) return; const dpr = window.devicePixelRatio || 1; c.width = (c.parentElement?.clientWidth || 800) * dpr; c.height = (c.parentElement?.clientHeight || 600) * dpr; c.style.width = (c.parentElement?.clientWidth || 800) + 'px'; c.style.height = (c.parentElement?.clientHeight || 600) + 'px'; draw(); }; rs(); window.addEventListener('resize', rs); return () => window.removeEventListener('resize', rs); }, [draw]);
   useEffect(() => { draw(); }, [draw]);
 
-  // Weather animation tick
+  // Weather animation — requestAnimationFrame, stops when tab hidden
   useEffect(() => {
     if (p.weather === 'none') return;
-    const iv = setInterval(draw, 50);
-    return () => clearInterval(iv);
+    let raf = 0;
+    let last = 0;
+    const tick = (now: number) => {
+      if (now - last > 50) {
+        draw();
+        last = now;
+      }
+      raf = requestAnimationFrame(tick);
+    };
+    const onVis = () => { if (document.hidden) { cancelAnimationFrame(raf); } else { raf = requestAnimationFrame(tick); } };
+    document.addEventListener('visibilitychange', onVis);
+    raf = requestAnimationFrame(tick);
+    return () => {
+      cancelAnimationFrame(raf);
+      document.removeEventListener('visibilitychange', onVis);
+    };
   }, [p.weather, draw]);
 
   const hWheel = (e: React.WheelEvent) => {
@@ -699,7 +713,7 @@ export function VTTCanvas(p: Props) {
           setOffY(ts.offY + e.touches[0].clientY - ts.y);
         }
       }}>
-      <canvas ref={canvasRef} className="w-full h-full" onMouseDown={hDown} onMouseMove={hMove} onMouseUp={hUp} onMouseLeave={hUp} onContextMenu={hCtx} />
+      <canvas ref={canvasRef} className="w-full h-full" aria-label="Игровая карта" role="img" onMouseDown={hDown} onMouseMove={hMove} onMouseUp={hUp} onMouseLeave={hUp} onContextMenu={hCtx} />
       {menu && (<>
         <div className="fixed inset-0 z-50" onClick={() => setMenu(null)} />
         <div className="fixed z-[60] bg-[#18181b] border border-white/[0.08] rounded-xl shadow-2xl py-1 min-w-[150px]" style={{ left: menu.x, top: menu.y }}>

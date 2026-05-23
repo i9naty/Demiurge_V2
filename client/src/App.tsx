@@ -1,3 +1,4 @@
+import { Suspense, lazy } from 'react';
 import { Routes, Route, useLocation, useNavigate } from 'react-router-dom';
 import { useEffect, Component, ReactNode, useState, useRef } from 'react';
 import { useStore } from './store';
@@ -7,18 +8,27 @@ import { DMPanel } from './components/social/DMPanel';
 import { ToastContainer } from './components/ui/Toast';
 import { CommandPalette, useCommandPalette } from './components/ui/CommandPalette';
 import { CreateModal } from './components/ui/CreateModal';
-import { HomePage } from './pages/HomePage';
-import { LoginPage } from './pages/LoginPage';
-import { RegisterPage } from './pages/RegisterPage';
-import { RoomPage } from './pages/RoomPage';
-import { WorldPage } from './pages/WorldPage';
-import { SocialPage } from './pages/SocialPage';
-import { ProfilePage } from './pages/ProfilePage';
-import { PaymentsPage } from './pages/PaymentsPage';
-import { SessionsPage } from './pages/SessionsPage';
-import { TavernPage } from './pages/TavernPage';
-import { StoryCreatePage } from './pages/StoryCreatePage';
-import { StoryGamePage } from './pages/StoryGamePage';
+
+const HomePage = lazy(() => import('./pages/HomePage').then(m => ({ default: m.HomePage })));
+const LoginPage = lazy(() => import('./pages/LoginPage').then(m => ({ default: m.LoginPage })));
+const RegisterPage = lazy(() => import('./pages/RegisterPage').then(m => ({ default: m.RegisterPage })));
+const RoomPage = lazy(() => import('./pages/RoomPage').then(m => ({ default: m.RoomPage })));
+const WorldPage = lazy(() => import('./pages/WorldPage').then(m => ({ default: m.WorldPage })));
+const SocialPage = lazy(() => import('./pages/SocialPage').then(m => ({ default: m.SocialPage })));
+const ProfilePage = lazy(() => import('./pages/ProfilePage').then(m => ({ default: m.ProfilePage })));
+const PaymentsPage = lazy(() => import('./pages/PaymentsPage').then(m => ({ default: m.PaymentsPage })));
+const SessionsPage = lazy(() => import('./pages/SessionsPage').then(m => ({ default: m.SessionsPage })));
+const TavernPage = lazy(() => import('./pages/TavernPage').then(m => ({ default: m.TavernPage })));
+const StoryCreatePage = lazy(() => import('./pages/StoryCreatePage').then(m => ({ default: m.StoryCreatePage })));
+const StoryGamePage = lazy(() => import('./pages/StoryGamePage').then(m => ({ default: m.StoryGamePage })));
+
+function PageLoader() {
+  return (
+    <div className="flex items-center justify-center h-full">
+      <div className="w-6 h-6 border-2 border-purple-500/20 border-t-purple-500 rounded-full animate-spin" />
+    </div>
+  );
+}
 
 class ErrorBoundary extends Component<{ children: ReactNode; resetKey: number }, { hasError: boolean; error: Error | null }> {
   constructor(props: { children: ReactNode; resetKey: number }) {
@@ -28,30 +38,25 @@ class ErrorBoundary extends Component<{ children: ReactNode; resetKey: number },
   static getDerivedStateFromError(error: Error) {
     return { hasError: true, error };
   }
-  componentDidCatch(error: Error, info: any) {
-    console.error('[ErrorBoundary]', error.message, info?.componentStack?.slice(0, 300));
-  }
   componentDidUpdate(prevProps: { resetKey: number }) {
-    if (this.state.hasError && prevProps.resetKey !== this.props.resetKey) {
+    if (prevProps.resetKey !== this.props.resetKey && this.state.hasError) {
       this.setState({ hasError: false, error: null });
     }
   }
   render() {
     if (this.state.hasError) {
       return (
-        <div className="h-full flex items-center justify-center bg-[#06060c]" role="alert">
-          <div className="text-center max-w-md px-4">
-            <div className="w-12 h-12 rounded-xl bg-red-500/10 border border-red-500/20 flex items-center justify-center mx-auto mb-3">
-              <span className="text-lg">⚠</span>
-            </div>
-            <p className="font-mono text-red-400 mb-2 text-sm">Ошибка на странице</p>
-            <p className="font-mono text-[10px] text-zinc-500 mb-5 break-all bg-white/[0.03] border border-white/[0.05] rounded-xl p-3 max-h-16 overflow-auto">
-              {this.state.error?.message}
+        <div className="flex items-center justify-center h-full">
+          <div className="text-center p-8">
+            <div className="text-4xl mb-4">💥</div>
+            <h2 className="text-lg font-mono text-red-400 mb-2">Ошибка</h2>
+            <p className="text-xs font-mono text-zinc-400 mb-4 max-w-md">
+              {this.state.error?.message?.slice(0, 200) || 'Неизвестная ошибка'}
             </p>
             <div className="flex gap-3 justify-center">
               <button onClick={() => this.setState({ hasError: false, error: null })}
-                className="px-5 py-2.5 rounded-xl font-mono text-xs border border-white/[0.06] text-zinc-400 hover:text-zinc-200 hover:border-white/[0.1] transition-all">
-                Попробовать снова
+                className="px-4 py-2 rounded-xl font-mono text-xs bg-white/[0.04] border border-white/[0.06] text-zinc-300 hover:bg-white/[0.06] transition-all">
+                Закрыть
               </button>
               <button onClick={() => window.location.reload()}
                 className="px-5 py-2.5 rounded-xl font-mono text-xs bg-purple-600 text-white hover:bg-purple-500 transition-all">
@@ -75,13 +80,13 @@ function AppRoutes() {
   const user = useStore((s) => s.user);
   const connectSocket = useStore((s) => s.connectSocket);
 
-  // Auth check on token change
   useEffect(() => {
     if (token && !user) {
       fetch('/api/auth/me', { headers: { Authorization: `Bearer ${token}` } })
         .then((r) => r.ok ? r.json() : null)
         .then((data) => {
-          if (data?.id) { useStore.setState({ user: data }); connectSocket(); }
+          if (data?.success && data.data?.id) { useStore.setState({ user: data.data }); connectSocket(); }
+          else if (data?.id) { useStore.setState({ user: data }); connectSocket(); }
         })
         .catch(() => {});
     }
@@ -121,27 +126,31 @@ function AppRoutes() {
   if (isProtectedRoute && !isAuth) {
     return (
       <ErrorBoundary resetKey={0}>
-        <LoginPage />
+        <Suspense fallback={<PageLoader />}>
+          <LoginPage />
+        </Suspense>
       </ErrorBoundary>
     );
   }
 
   return (
     <ErrorBoundary resetKey={resetKey.current}>
-      <Routes>
-        <Route path="/" element={<HomePage />} />
-        <Route path="/login" element={<LoginPage />} />
-        <Route path="/register" element={<RegisterPage />} />
-        <Route path="/room/:roomId" element={<RoomPage />} />
-        <Route path="/world/:roomId" element={<WorldPage />} />
-        <Route path="/social" element={<SocialPage />} />
-        <Route path="/profile/:username" element={<ProfilePage />} />
-        <Route path="/payments" element={<PaymentsPage />} />
-        <Route path="/sessions" element={<SessionsPage />} />
-        <Route path="/discord" element={<TavernPage />} />
-        <Route path="/story" element={<StoryCreatePage />} />
-        <Route path="/story/:sessionId" element={<StoryGamePage />} />
-      </Routes>
+      <Suspense fallback={<PageLoader />}>
+        <Routes>
+          <Route path="/" element={<HomePage />} />
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/register" element={<RegisterPage />} />
+          <Route path="/room/:roomId" element={<RoomPage />} />
+          <Route path="/world/:roomId" element={<WorldPage />} />
+          <Route path="/social" element={<SocialPage />} />
+          <Route path="/profile/:username" element={<ProfilePage />} />
+          <Route path="/payments" element={<PaymentsPage />} />
+          <Route path="/sessions" element={<SessionsPage />} />
+          <Route path="/discord" element={<TavernPage />} />
+          <Route path="/story" element={<StoryCreatePage />} />
+          <Route path="/story/:sessionId" element={<StoryGamePage />} />
+        </Routes>
+      </Suspense>
     </ErrorBoundary>
   );
 }
@@ -158,7 +167,6 @@ export default function App() {
     return () => window.removeEventListener('open:create_modal', handler);
   }, []);
 
-  // DM notification badge in title
   useEffect(() => {
     const base = 'Demiurge';
     if (!socket) { document.title = base; return; }
