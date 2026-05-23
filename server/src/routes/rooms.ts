@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { v4 as uuid } from 'uuid';
+import bcrypt from 'bcryptjs';
 import { query } from '../config/database';
 import { authMiddleware, optionalAuth } from '../middleware/auth';
 import { ok, fail } from '../middleware/response';
@@ -9,7 +10,7 @@ export const roomsRouter = Router();
 // Создать комнату
 roomsRouter.post('/', authMiddleware, async (req: Request, res: Response) => {
   try {
-    const { name, description, mode = 'vtt', isPublic = false, maxPlayers = 8, gameType = 'D&D 5e', password: _password, expiresIn } = req.body;
+    const { name, description, mode = 'vtt', isPublic = false, maxPlayers = 8, gameType = 'D&D 5e', password, expiresIn } = req.body;
     if (!name?.trim()) { fail(res, 'INVALID_INPUT', 'Название обязательно', 400); return; }
     if (!['vtt', 'world'].includes(mode)) { fail(res, 'INVALID_INPUT', 'vtt или world', 400); return; }
     if (maxPlayers < 1 || maxPlayers > 50) { fail(res, 'INVALID_INPUT', 'Игроки: 1-50', 400); return; }
@@ -17,11 +18,12 @@ roomsRouter.post('/', authMiddleware, async (req: Request, res: Response) => {
     const roomId = uuid();
     const inviteCode = uuid().slice(0, 8).toUpperCase();
     const expiresAt = expiresIn ? new Date(Date.now() + parseInt(expiresIn) * 3600000).toISOString() : null;
+    const passwordHash = password ? await bcrypt.hash(password, 12) : null;
 
     await query(
-      `INSERT INTO rooms (id, name, description, owner_id, mode, is_public, invite_code, max_players, game_type, expires_at)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
-      [roomId, name, description || '', req.user!.userId, mode, isPublic, inviteCode, maxPlayers, gameType, expiresAt]
+      `INSERT INTO rooms (id, name, description, owner_id, mode, is_public, invite_code, max_players, game_type, expires_at, password_hash)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
+      [roomId, name, description || '', req.user!.userId, mode, isPublic, inviteCode, maxPlayers, gameType, expiresAt, passwordHash]
     );
 
     await query(
@@ -130,7 +132,6 @@ roomsRouter.post('/join/:code', authMiddleware, async (req: Request, res: Respon
     if (r.password_hash) {
       const { password } = req.body;
       if (!password) { fail(res, 'FORBIDDEN', 'Требуется пароль', 403); return; }
-      const bcrypt = require('bcryptjs');
       const valid = await bcrypt.compare(password, r.password_hash);
       if (!valid) { fail(res, 'FORBIDDEN', 'Неверный пароль', 403); return; }
     }
